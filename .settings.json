@@ -1,7 +1,12 @@
 {
   "projects": "~/Projects",
-  "theme": "dracula",
+  "theme": "native",
   "themes": [
+    {
+      "id": "native",
+      "title": "Native",
+      "file": "Native-theme.css"
+    },
     {
       "id": "terminal",
       "title": "Terminal",
