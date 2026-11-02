@@ -33,6 +33,24 @@ sizes per session in the browser; the TUI keeps them until it quits. In the web,
 
 ![Transcripts](assets/transcripts.png)
 
+### Focus
+
+The web's `focus` tab (`4`, or the corners icon on a tile or a transcript box) gives one session the whole page: the codebase on
+the left (`git ls-files` from the session's folder, ignored files left out), its chat box next to it,
+then an editor, `git status` on the right, and the session's information below that. Pick the session in the
+menu above, or with `←`/`→`. The panes refresh every 5s. The box works as in transcripts. Drag the editor's left edge to share the width between chat and editor, or focus it with Tab and use `←`/`→`; the split is remembered.
+
+The git status pane has `commit`, `push` and `fetch` buttons, run in the session's folder. `commit` takes what is staged, or
+every change including untracked files if nothing is staged. `push` asks first, and sets the upstream on a new branch.
+`generate` fills in the message with a headless `claude -p` (`$CS_CHAT_MODEL`), for you to edit before committing. It sees the
+diff of what `commit` would take (first 30k characters), the names of new files and the recent commit subjects.
+
+Click a file in the codebase to edit it, `⌘/ctrl-S` or `save` writes it. The editor has line numbers, indent guides,
+syntax colors (JS/TS, Python, shell, PHP, C-family, CSS, HTML, JSON, YAML/TOML, Markdown; files over 150 KB stay plain)
+and keeps the indentation on enter; `tab` and `shift-tab` indent and outdent the selected lines. Files over 1 MB, binary files and files
+outside the session's folder don't open. An unchanged editor follows the disk; if a file you changed also changed
+on disk, saving asks before overwriting.
+
 ### Sessions run by cs
 
 `cs` can run sessions itself, with no terminal: `claude -p` in stream-json mode, with its permission
@@ -112,7 +130,7 @@ there is one for the same port (Chrome, Edge or Brave apps in `~/Applications`).
 
 Keys: arrows select, Enter or click focuses the session's app, `/` opens the chat (Esc closes),
 `p` searches projects, `a` toggles ended sessions, `t` switches between tiles and the table layout, `r` refreshes,
-`1`, `2` and `3` switch between sessions, [tasks](#tasks) and [transcripts](#transcripts).
+`1`, `2`, `3` and `4` switch between sessions, [tasks](#tasks), [transcripts](#transcripts) and [focus](#focus).
 
 ![Table layout](assets/table.png)
 

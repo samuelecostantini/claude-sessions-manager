@@ -150,7 +150,7 @@ kbd { font: inherit; color: var(--fg); }
 .kv { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); row-gap: 3px; margin: 16px 0 0; font-size: 13px; }
 .kv dt { color: var(--dim); }
 .kv dd { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.kv dd.path { direction: rtl; text-align: left; font: 12.5px/1.6 var(--mono); }
+.kv dd.path { font: 12.5px/1.6 var(--mono); }
 .cy { color: var(--cyan); font: 12.5px var(--mono); }
 
 .agents { margin-top: 14px; padding: 10px 12px; background: var(--surface-2); border-radius: 10px; font-size: 12.5px; }
@@ -498,3 +498,63 @@ kbd { font: inherit; color: var(--fg); }
 .md table { display: block; overflow-x: auto; border-collapse: collapse; font-size: .92em; }
 .md th, .md td { border: 1px solid color-mix(in srgb, var(--dim) 40%, transparent); padding: 2px 8px; text-align: left; }
 .md a { color: var(--orange); }
+
+/* focus: the transcripts view narrowed to the selected box, with codebase, git status and session panes */
+.tx-view:not(.fx) .fx-only, .tx-view.fx .tx-new, .tx-view.fx .tx-size, .tx-view.fx .txbox:not(.sel) { display: none; }
+.tx-view.fx:not([hidden]) { display: grid; height: 100%; min-height: 420px; grid-template-columns: minmax(160px, .7fr) minmax(0, var(--fx-chat, 2fr)) minmax(0, var(--fx-ed, 2fr)) minmax(170px, .8fr); grid-template-rows: auto minmax(0, 1fr); gap: 18px 14px; }
+.tx-view.fx .tk-bar { grid-column: 1 / -1; margin: 0; }
+.tx-view.fx .txs { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-auto-rows: 0; padding-top: 0; min-width: 0; min-height: 0; }
+.tx-view.fx .txbox { grid-area: 1 / 1; }
+.tx-view.fx .txbox .chat-head { cursor: default; }
+.fx-right { display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; min-width: 0; min-height: 0; }
+.fx-pane { display: flex; flex-direction: column; margin-top: 0; min-width: 0; min-height: 0; cursor: default; }
+.fx-pane .chat-log { display: block; flex: 1; min-height: 0; margin-bottom: 0; border-bottom: 0; font-size: 12.5px; }
+.fx-tree details > details, .fx-tree details > .fx-file { margin-left: 12px; }
+.fx-tree summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fx-file, .fx-st { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.fx-file { color: var(--dim); padding-left: 12px; }
+.fx-kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; margin: 0; }
+.fx-kv dt { color: var(--dim); }
+.fx-kv dd { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fx-file { display: block; width: 100%; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.fx-file:hover, .fx-file:focus-visible { color: var(--fg); outline: 0; }
+.fx-ed { position: relative; }
+/* inside the editor's left edge: a pane can clip with overflow: hidden, so it can't sit in the gap */
+.fx-split { position: absolute; z-index: 1; top: 0; bottom: 0; left: 0; width: 8px; cursor: col-resize; touch-action: none; }
+.fx-split::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 2px; border-radius: 1px; background: var(--orange); opacity: 0; transition: opacity .15s; }
+.fx-split:hover::after, .fx-split:focus-visible::after { opacity: 1; }
+.fx-split:focus-visible { outline: 0; }
+.fx-ed .chat-head { align-items: center; }
+.fx-ed .chat-side { flex: 1; min-width: 0; }
+.fx-ed .chat-head button { flex: none; padding: 0 8px; pointer-events: auto; }
+.fx-editor { --lh: 20px; --pad: 10px; --ind: 4; --cur: 0; --sx: 0; --sy: 0; flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.fx-nums, .fx-hl, .fx-ed textarea { margin: 0; font: 12.5px/var(--lh) var(--mono); font-variant-ligatures: none; white-space: pre; tab-size: 4; }
+.fx-nums { flex: none; min-width: 2ch; padding: var(--pad) 10px var(--pad) 12px; color: var(--gray); text-align: right; user-select: none; transform: translateY(calc(var(--sy) * -1px)); }
+.fx-edmain { position: relative; flex: 1; min-width: 0; display: flex; overflow: hidden; }
+.fx-curline { position: absolute; left: 0; right: 0; height: var(--lh); top: calc(var(--pad) + var(--cur) * var(--lh) - var(--sy) * 1px); background: var(--track); opacity: .45; pointer-events: none; }
+.fx-hl { position: absolute; top: 0; left: 0; padding: var(--pad) 12px var(--pad) 4px; color: var(--fg); pointer-events: none; transform: translate(calc(var(--sx) * -1px), calc(var(--sy) * -1px)); }
+.fx-hl .k { color: var(--violet); }
+.fx-hl .s { color: var(--green); }
+.fx-hl .n { color: var(--amber); }
+.fx-hl .c { color: var(--dim); }
+.fx-hl .f { color: var(--cyan); }
+.fx-hl .t, .fx-hl .v { color: var(--orange); }
+.fx-hl .ig { display: inline-block; vertical-align: top; background: linear-gradient(to right, var(--track) 1px, transparent 1px) 0 0 / calc(var(--ind) * 1ch) 100%; }
+.fx-ed textarea { position: relative; flex: 1; min-height: 0; width: 100%; box-sizing: border-box; padding: var(--pad) 12px var(--pad) 4px; border: 0; outline: 0; resize: none; overflow: auto; color: transparent; caret-color: var(--fg); background: none; }
+.fx-ed textarea::placeholder { color: var(--dim); }
+.fx-ed textarea::selection { color: transparent; background: color-mix(in srgb, var(--cyan) 30%, transparent); }
+.fx-git { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; }
+.fx-git input { flex: 1 1 100%; min-width: 0; font: inherit; color: var(--fg); background: transparent; border: 1px solid var(--gray); border-radius: 6px; padding: 3px 8px; }
+.fx-git input:focus { outline: none; border-color: var(--orange); }
+.fx-git-out { flex: 1 1 100%; max-height: 8em; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--dim); font: 12px/1.4 var(--mono); }
+.fx-git-out:empty { display: none; }
+.tile-fx { right: 36px; }
+.tx-fx { position: static; flex: none; padding: 3px; }
+.tx-view.fx .tx-fx { display: none; }
+@media (max-width: 900px) {
+  .tx-view.fx:not([hidden]) { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-auto-rows: auto; }
+  .tx-view.fx .txs { order: -1; height: 70vh; }
+  .fx-pane { height: 40vh; }
+  .fx-split { display: none; }
+  .fx-right { grid-template-rows: none; }
+}

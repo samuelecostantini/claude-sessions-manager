@@ -16,7 +16,7 @@
 <body>
 <div class="app">
   <header class="top"><div class="top-info" id="head"><span class="brand">✻ Claude sessions</span></div>
-    <nav class="tabs" id="tabs" aria-label="View"><button type="button" data-tab="sessions">sessions</button><button type="button" data-tab="tasks">tasks <span class="tab-n" id="tabN"></span></button><button type="button" data-tab="tx">transcripts</button></nav>
+    <nav class="tabs" id="tabs" aria-label="View"><button type="button" data-tab="sessions">sessions</button><button type="button" data-tab="tasks">tasks <span class="tab-n" id="tabN"></span></button><button type="button" data-tab="tx">transcripts</button><button type="button" data-tab="focus">focus</button></nav>
     <label class="theme-pick"><span>theme</span><select id="theme" aria-label="Theme"></select></label></header>
   <main class="body" id="main">
     <div class="tiles" id="tiles"></div>
@@ -30,7 +30,14 @@
         <button type="submit" class="tk-btn primary">start</button>
         <datalist id="txDirs"></datalist>
       </form>
+      <div class="tk-bar fx-only"><label class="tk-auto">session <select id="fxSel" aria-label="Session"></select></label></div>
+      <aside class="chat fx-pane fx-only" aria-label="Codebase"><div class="chat-head"><span class="chat-title">✻ codebase</span><span class="chat-side" id="fxCodeSide"></span></div><div class="chat-log fx-tree" id="fxCode"></div></aside>
       <div class="txs" id="txs"></div>
+      <aside class="chat fx-pane fx-ed fx-only" aria-label="File editor"><div class="fx-split" id="fxSplit" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize chat and editor" aria-valuemin="20" aria-valuemax="80" title="drag to resize the chat and the editor"></div><div class="chat-head"><span class="chat-title">✻ editor</span><span class="chat-side" id="fxEdPath"></span><button type="button" class="tk-btn" id="fxEdSave" title="save (⌘/ctrl-S)" disabled>save</button></div><div class="fx-editor" id="fxEdWrap"><pre class="fx-nums" id="fxEdNums" aria-hidden="true"></pre><div class="fx-edmain"><div class="fx-curline" id="fxEdLine" hidden></div><pre class="fx-hl" id="fxEdHl" aria-hidden="true"></pre><textarea id="fxEd" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File contents" placeholder="click a file in the codebase to open it here" readonly></textarea></div></div></aside>
+      <div class="fx-right fx-only">
+        <aside class="chat fx-pane" aria-label="Git status"><div class="chat-head"><span class="chat-title">✻ git status</span></div><form class="fx-git" id="fxGitBar" hidden><input name="msg" placeholder="commit message" aria-label="Commit message" spellcheck="false" autocomplete="off"><button type="button" class="tk-btn" data-git="message" title="write the message with Claude, from what commit would take: it reads the diff">generate</button><button type="submit" class="tk-btn" title="commit what is staged, or every change if nothing is staged">commit</button><button type="button" class="tk-btn" data-git="push">push</button><button type="button" class="tk-btn" data-git="fetch">fetch</button><div class="fx-git-out" id="fxGitOut" role="status"></div></form><div class="chat-log" id="fxGit"></div></aside>
+        <aside class="chat fx-pane" aria-label="Session information"><div class="chat-head"><span class="chat-title">✻ session</span></div><div class="chat-log" id="fxInfo"></div></aside>
+      </div>
     </section>
     <section class="tasks" id="tasks" aria-label="Tasks" hidden>
       <div class="tk-bar">
@@ -127,14 +134,17 @@ let FRAME = 0;
 let lastPoll = 0, polling = false, chatSig = "";
 let themeSetAt = 0;
 let projSel = 0, projSig = "";
-let tab = ["tasks", "tx"].includes(store.get("cs.tab")) ? store.get("cs.tab") : "sessions";
+let tab = ["tasks", "tx", "focus"].includes(store.get("cs.tab")) ? store.get("cs.tab") : "sessions";
 let tkShow = store.get("cs.tkshow") === "all" ? "all" : "open";
 let tkSel = null, tkCur = null, tkLoading = null, tkMode = null, tkSig = "", tkInfoSig = "", tkDlSig = "";
 let txSizes = {}, txOrder = [], txDrag = null, txScrollTo = null;
+let fxSid = null, fxT = 0, fxData = null;
+let fxEdit = null, fxReq = 0, fxEdLines = 0;
 try { txSizes = JSON.parse(store.get("cs.txsize") || "{}") || {}; } catch {}
 try { txOrder = JSON.parse(store.get("cs.txorder") || "[]") || []; } catch {}
 const TX_SIZES = ["1x1", "2x1", "2x2", "full", "full2"];
 const txSizeName = z => z === "full" ? "full width" : z === "full2" ? "full width, 2 rows" : `${z.replace("x", "×")} (columns × rows)`;
+const FX_ICON = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3"/></svg>`;
 const CHAT_ICON = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2.5 2.5h11a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7.5l-3.5 2.5v-2.5H2.5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z"/><path d="M4.5 5.5h7M4.5 8h4.5"/></svg>`;
 // a 2×2 grid with the cells the size covers filled in; full width is one bar across the top (both rows for full2)
 const txIcon = z => {
@@ -308,7 +318,8 @@ function tileHTML(r) {
     + `<div class="meta"><div><span class="dim">MODEL</span> ${esc(String(r.model).replace("claude-", ""))}</div>`
     + `<div class="pairs">${pair("turns", r.turns, "tools", r.tools)}${pair("out", fmt(r.out), "cache", fmt(r.cread))}`
     + `${pair("up", r.uptime, "idle", r.updated ? ago(r.updated) : "-")}</div></div>`
-    + `<button type="button" class="tile-tx" data-tx title="open in transcripts, as a 2×2 box" aria-label="Open in transcripts">${CHAT_ICON}</button></article>`;
+    + `<button type="button" class="tile-tx" data-tx title="open in transcripts, as a 2×2 box" aria-label="Open in transcripts">${CHAT_ICON}</button>`
+    + `<button type="button" class="tile-tx tile-fx" data-fx title="open in focus: transcript, codebase, git status, session information" aria-label="Open in focus">${FX_ICON}</button></article>`;
 }
 
 function tableHTML(rows) {
@@ -406,12 +417,13 @@ function txPlaceholder(r) {
 
 function renderTx() {
   const box = $("txs");
-  if (tab !== "tx") return;
+  if (tab !== "tx" && tab !== "focus") return;
   const dirs = (S.projects || []).map(p => p.path), dsig = dirs.join("\n");
   if ($("txDirs")._sig !== dsig) { $("txDirs").replaceChildren(...dirs.map(d => new Option(home(d), home(d)))); $("txDirs")._sig = dsig; }
   const rank = r => { const i = txOrder.indexOf(r.sid); return i < 0 ? 1e9 : i; };
   // boxes you never moved keep the server order, after the ones you did
   const rows = S.sessions.filter(r => r.tx).sort((a, b) => rank(a) - rank(b));
+  if (tab === "focus") renderFocus(rows);
   const old = new Map([...box.children].map(el => [el.dataset.sid, el]));
   const cols = getComputedStyle(box).gridTemplateColumns.split(" ").filter(Boolean).length;
   let prev = null;
@@ -425,6 +437,7 @@ function renderTx() {
         + `<div class="tx-ask" hidden></div>`
         + `<div class="chat-field"><span class="p">❯</span><input class="tx-input" autocomplete="off" spellcheck="false">`
         + `<span class="tx-size" role="group" aria-label="Box size"><span class="tx-size-pop">${TX_SIZES.map(z => `<button type="button" data-size="${z}" title="${txSizeName(z)}" aria-label="size ${txSizeName(z)}">${txIcon(z)}</button>`).join("")}</span></span>`
+        + `<button type="button" class="tile-tx tx-fx" data-act="fx" title="open in focus: transcript, codebase, git status, session information" aria-label="Open in focus">${FX_ICON}</button>`
         + `<select class="tx-mode" aria-label="Permission mode" title="permission mode">${$("txNew").elements.mode.innerHTML}</select>`
         + `<button type="button" class="tk-btn" data-act="stop"></button><button type="button" class="tk-btn" data-act="focus">focus</button></div>`;
     }
@@ -476,6 +489,248 @@ function renderTx() {
   // the box only exists once a poll with transcripts has come back
   const want = txScrollTo && box.querySelector(`.txbox[data-sid="${CSS.escape(txScrollTo)}"]`);
   if (want) { want.scrollIntoView({ block: "start" }); txScrollTo = null; }
+}
+
+async function fxLoad(sid) {
+  fxT = Date.now();
+  let d;
+  try { d = await api(`/api/session/code?sid=${encodeURIComponent(sid)}`); }
+  catch (e) { d = { files: [], status: null, err: e.message }; }
+  if (sid === fxSid) { fxData = d; render(); }
+  fxRefresh();
+}
+
+const fxDirty = () => !!fxEdit && $("fxEd").value !== fxEdit.saved;
+const fxReadFile = (sid, path) => api(`/api/session/file?sid=${encodeURIComponent(sid)}&path=${encodeURIComponent(path)}`).catch(e => ({ err: e.message }));
+
+function fxEdShow() {
+  const dirty = fxDirty(), other = fxEdit && fxEdit.sid !== fxSid;
+  $("fxEdPath").textContent = fxEdit ? `${dirty ? "● " : ""}${other ? "other session: " : ""}${fxEdit.path}` : "";
+  $("fxEdPath").title = fxEdit ? fxEdit.path : "";
+  $("fxEdSave").disabled = !dirty;
+  $("fxEd").readOnly = !fxEdit;
+}
+
+function fxEdSet(edit, text) {
+  fxEdit = edit;
+  $("fxEd").value = text;
+  fxEdShow();
+  fxEdPaint();
+}
+
+// each rule is [css class, regex source without capture groups]; first match at a position wins
+// shortcut: regexes, not parsers: JS regex literals and code embedded in HTML aren't recognised, use a real grammar if that starts to hurt
+const fxDQ = String.raw`"(?:[^"\\\n]|\\[\s\S])*"`, fxSQ = String.raw`'(?:[^'\\\n]|\\[\s\S])*'`, fxBT = String.raw`${"`"}(?:[^${"`"}\\]|\\[\s\S])*${"`"}`;
+const fxBlock = String.raw`/\*[\s\S]*?\*/`, fxHtmlC = "<!--[\\s\\S]*?-->";
+const fxNum = String.raw`\b(?:0[xXbBoO][\da-fA-F_]+|\d[\d_]*(?:\.\d+)?(?:[eE][+-]?\d+)?)\b`;
+const fxKw = words => `\\b(?:${words.replace(/ /g, "|")})\\b`;
+const fxCode = (comment, strings, words, extra = []) => [["c", comment], ["s", strings], ...extra, ["n", fxNum], ["k", fxKw(words)], ["f", String.raw`[A-Za-z_$][\w$]*(?=\s*\()`], ["t", String.raw`\b[A-Z]\w*`]];
+const fxConf = [["c", "#.*|^;.*"], ["t", String.raw`^\[.*\]$`], ["f", String.raw`(?<=^[ \t]*(?:- )?)[\w.-]+(?=\s*[:=])`], ["s", `${fxDQ}|${fxSQ}`], ["n", fxNum], ["k", fxKw("true false null yes no on off")]];
+const fxSh = [["c", String.raw`(?<![\w$])#.*`], ["s", `${fxDQ}|${fxSQ}`], ["v", String.raw`\$\{?\w+\}?`], ["n", fxNum],
+  ["k", fxKw("if then elif else fi for while until do done case esac in function select return exit local export readonly true false")],
+  ["f", String.raw`(?<=^[ \t]*|[|;&(]\s*|\b(?:then|do|else|sudo|time)\s+)(?![\w./-]*=)[\w./-]+|[\w-]+(?=\s*\(\))`]];
+const fxPy = fxCode("#.*", `"""[\\s\\S]*?"""|'''[\\s\\S]*?'''|${fxDQ}|${fxSQ}`, "and as assert async await break case class continue def del elif else except False finally for from global if import in is lambda match None nonlocal not or pass raise return self True try while with yield");
+const fxJs = fxCode(`//.*|${fxBlock}`, `${fxBT}|${fxDQ}|${fxSQ}`, "as async await break case catch class const continue debugger default delete do else enum export extends false finally for from function get if implements import in instanceof interface let new null of private protected public readonly return set static super switch this throw true try type typeof undefined var void while with yield");
+const fxLangs = [
+  [/\.(?:[cm]?[jt]sx?)$/i, fxJs],
+  [/\.(?:py|pyw)$/i, fxPy],
+  [/(?:\.(?:sh|bash|zsh)|(?:^|\/)\.(?:bash|zsh)(?:rc|_profile)|(?:^|\/)\.zprofile)$/i, fxSh],
+  [/\.php$/i, fxCode(`//.*|#(?!\\[).*|${fxBlock}`, `${fxDQ}|${fxSQ}`, "abstract and array as break case catch class clone const continue declare default do echo else elseif empty enum extends false final finally fn for foreach function global if implements include instanceof interface isset list match namespace new null or parent private protected public readonly require return self static switch throw trait true try unset use var while yield", [["v", String.raw`\$\w+`]])],
+  [/\.(?:go|rs|java|kt|kts|c|h|cc|cpp|hpp|cs|swift)$/i, fxCode(`//.*|${fxBlock}`, `${fxBT}|${fxDQ}|${fxSQ}`, "auto bool break case catch char class const continue default defer delete do double else enum extern false final float fn for func go if impl implements import in int interface let long match mod mut namespace new nil null override package private protected pub public return self short signed sizeof static string struct super switch template this throw trait true try type typedef union unsigned use using var virtual void volatile while")],
+  [/\.(?:css|scss|less)$/i, [["c", fxBlock], ["s", `${fxDQ}|${fxSQ}`], ["n", `#[\\da-fA-F]{3,8}\\b|${fxNum}`], ["k", "@[\\w-]+"], ["v", "--[\\w-]+"], ["f", String.raw`[\w-]+(?=\s*:)`], ["t", "[.#][\\w-]+"]]],
+  [/\.(?:html?|xml|svg|vue|blade\.php)$/i, [["c", fxHtmlC], ["s", String.raw`(?<==\s*)(?:${fxDQ}|${fxSQ})`], ["k", String.raw`</?[\w:-]+|/?>`], ["f", String.raw`[\w:-]+(?=\s*=)`]]],
+  [/\.json[c5]?$/i, [["f", `${fxDQ}(?=\\s*:)`], ["s", fxDQ], ["n", fxNum], ["k", fxKw("true false null")]]],
+  [/(?:\.(?:ya?ml|toml|ini|cfg|conf)|(?:^|\/)\.env(?:\.[\w.-]+)?)$/i, fxConf],
+  [/\.(?:md|markdown)$/i, [["c", fxHtmlC], ["s", "```[\\s\\S]*?```|`[^`\\n]+`"], ["k", "^#{1,6} .*"], ["n", String.raw`(?<=^[ \t]*)(?:[-*+]|\d+\.)(?= )`], ["f", String.raw`\*\*[^*\n]+\*\*`], ["t", String.raw`\[[^\]\n]*\]\([^)\n]*\)`]]],
+];
+const fxShebang = [[/^#!.*\b(?:ba|z|da|k)?sh\b/, fxSh], [/^#!.*\bpython/, fxPy], [/^#!.*\b(?:node|deno|bun)\b/, fxJs]];
+const fxRes = new Map();
+
+function fxHighlight(text, path) {
+  const rules = (fxLangs.find(l => l[0].test(path)) || fxShebang.find(l => l[0].test(text)) || [])[1] || [];
+  const all = [["ig", "^[ \\t]+"], ...rules];
+  if (!fxRes.has(rules)) fxRes.set(rules, new RegExp(all.map(r => `(${r[1]})`).join("|"), "gm"));
+  let html = "", at = 0;
+  for (const m of text.matchAll(fxRes.get(rules))) {
+    html += `${esc(text.slice(at, m.index))}<span class="${all[m.slice(1).findIndex(g => g !== undefined)][0]}">${esc(m[0])}</span>`;
+    at = m.index + m[0].length;
+  }
+  return html + esc(text.slice(at));
+}
+
+const fxIndent = text => /^\t/m.test(text) ? "\t" : /^ {2}\S/m.test(text) ? "  " : "    ";
+const FX_HL_MAX = 150000; // past this, retokenising every keystroke lags: the file shows uncoloured
+
+function fxEdPaint() {
+  const text = $("fxEd").value, wrap = $("fxEdWrap"), lines = fxEdit ? text.split("\n").length : 0;
+  // the trailing newline keeps the layer as tall as the textarea when the file ends in one
+  $("fxEdHl").innerHTML = (text.length > FX_HL_MAX ? esc(text) : fxHighlight(text, fxEdit?.path ?? "")) + "\n";
+  if (lines !== fxEdLines) $("fxEdNums").textContent = Array.from({ length: fxEdLines = lines }, (_, i) => i + 1).join("\n");
+  wrap.style.setProperty("--ind", fxIndent(text) === "  " ? 2 : 4);
+  $("fxEdLine").hidden = !fxEdit;
+  fxEdCursor();
+}
+
+function fxEdCursor() {
+  const ed = $("fxEd"), at = ed.selectionDirection === "backward" ? ed.selectionStart : ed.selectionEnd;
+  $("fxEdWrap").style.setProperty("--cur", ed.value.slice(0, at).split("\n").length - 1);
+}
+
+function fxEdScroll() {
+  const ed = $("fxEd"), st = $("fxEdWrap").style;
+  st.setProperty("--sx", ed.scrollLeft);
+  st.setProperty("--sy", ed.scrollTop);
+}
+
+// tab at the caret or over one line inserts; across lines it indents them, shift-tab outdents; execCommand keeps the undo stack
+function fxEdShift(ed, out) {
+  const v = ed.value, a = ed.selectionStart, b = ed.selectionEnd, unit = fxIndent(v);
+  if (!out && !v.slice(a, b).includes("\n")) return void document.execCommand("insertText", false, unit);
+  const from = a ? v.lastIndexOf("\n", a - 1) + 1 : 0, last = b > a && v[b - 1] === "\n" ? b - 1 : b;
+  const nl = v.indexOf("\n", last), to = nl < 0 ? v.length : nl, old = v.slice(from, to);
+  const strip = new RegExp(`^(?:\\t| {1,${unit === "\t" ? 4 : unit.length}})`);
+  const text = old.split("\n").map(l => out ? l.replace(strip, "") : /\S/.test(l) ? unit + l : l).join("\n");
+  if (text === old) return;
+  ed.setSelectionRange(from, to);
+  document.execCommand("insertText", false, text);
+  if (a === b) { const c = Math.max(from, a + text.length - old.length); ed.setSelectionRange(c, c); }
+  else ed.setSelectionRange(from, from + text.length);
+}
+
+async function fxOpen(sid, path) {
+  if (fxDirty() && !confirm(`Discard unsaved changes to ${fxEdit.path}?`)) return;
+  const id = ++fxReq, d = await fxReadFile(sid, path);
+  if (id !== fxReq) return;
+  if (d.err) { flash = [`${path}: ${d.err}`, Date.now()]; renderHint(); return; }
+  fxEdSet({ sid, path, ver: d.ver, saved: d.text.replace(/\r\n?/g, "\n") }, d.text);
+  $("fxEd").setSelectionRange(0, 0);
+  $("fxEd").scrollTop = 0;
+  fxEdCursor();
+}
+
+// sessions edit files too: a clean editor follows the disk, unsaved text is settled by the conflict check on save
+async function fxRefresh() {
+  const cur = fxEdit;
+  if (!cur || fxDirty()) return;
+  const d = await fxReadFile(cur.sid, cur.path);
+  if (fxEdit !== cur || fxDirty() || d.err || d.ver === cur.ver) return;
+  const ed = $("fxEd"), top = ed.scrollTop, a = ed.selectionStart, b = ed.selectionEnd;
+  fxEdSet({ ...cur, ver: d.ver, saved: d.text.replace(/\r\n?/g, "\n") }, d.text);
+  ed.setSelectionRange(a, b);
+  ed.scrollTop = top;
+  fxEdCursor();
+}
+
+async function fxSave(force) {
+  if (!fxDirty()) return;
+  const cur = fxEdit, text = $("fxEd").value;
+  let d;
+  try { d = await api("/api/session/file", { sid: cur.sid, path: cur.path, text, base: cur.ver, force: !!force }); }
+  catch (e) { d = { err: e.message }; }
+  if (d.conflict) {
+    if (confirm(`${cur.path} changed on disk since you opened it. Overwrite it with your version?`)) return fxSave(true);
+    flash = [`not saved: ${cur.path} changed on disk`, Date.now()];
+  } else if (d.err) flash = [`could not save ${cur.path}: ${d.err}`, Date.now()];
+  else {
+    flash = [`saved ${cur.path}`, Date.now()];
+    if (fxEdit === cur) { fxEdit = { ...cur, ver: d.ver, saved: text }; fxEdShow(); }
+  }
+  renderHint();
+}
+
+function fxTreeHTML(files, open) {
+  const root = Object.create(null);
+  for (const f of files) { let n = root; for (const p of f.split("/")) n = n[p] ??= Object.create(null); }
+  const walk = (n, pre) => Object.keys(n)
+    // folders first; a file name can be "__proto__", hence the null prototypes
+    .sort((a, b) => !Object.keys(n[a]).length - !Object.keys(n[b]).length || a.localeCompare(b))
+    .map(k => {
+      const path = pre + k;
+      return Object.keys(n[k]).length
+        ? `<details data-path="${esc(path)}"${open.has(path) ? " open" : ""}><summary title="${esc(path)}">${esc(k)}</summary>${walk(n[k], path + "/")}</details>`
+        : `<button type="button" class="fx-file" data-path="${esc(path)}" title="${esc(path)}">${esc(k)}</button>`;
+    }).join("");
+  return walk(root, "");
+}
+
+function fxGitHTML(d) {
+  if (d.err) return `<span class="dim">${esc(d.err)}</span>`;
+  if (!d.status) return `<span class="dim">not a git repo</span>`;
+  const lines = d.status.filter(l => !l.startsWith("## "));
+  const head = d.status.find(l => l.startsWith("## "));
+  return (head ? `<div class="fx-st cy" title="${esc(head.slice(3))}">${esc(head.slice(3))}</div>` : "")
+    + (lines.length ? lines.map(l => {
+      const c = l.startsWith("??") ? "var(--dim)" : l[0] !== " " ? "var(--green)" : "var(--amber)";
+      return `<div class="fx-st" title="${esc(l.slice(3))}"><b style="color:${c}">${esc(l.slice(0, 2))}</b> ${esc(l.slice(3))}</div>`;
+    }).join("") : `<span class="dim">working tree clean</span>`);
+}
+
+async function fxGitRun(action) {
+  const sid = fxSid, bar = $("fxGitBar"), out = $("fxGitOut"), btns = [...bar.querySelectorAll("button")];
+  if (!sid || btns[0].disabled) return;
+  const show = (text, ok) => { if (sid === fxSid) { out.textContent = text; out.style.color = ok ? "" : "var(--red)"; } };
+  const message = bar.elements.msg.value.trim();
+  if (action === "commit" && !message) { bar.elements.msg.focus(); return show("write a commit message first"); }
+  const head = fxData?.status?.find(l => l.startsWith("## "))?.slice(3) || "";
+  if (action === "push" && !confirm(`Push ${$("fxCodeSide").textContent}?\n\n${head}`)) return;
+  btns.forEach(b => b.disabled = true);
+  show(action === "message" ? "asking Claude…" : `git ${action}…`, true);
+  try {
+    const d = await api("/api/session/git", { sid, action, message });
+    show(action === "message" && d.ok ? "" : d.out, d.ok);
+    if (d.ok && sid === fxSid) {
+      if (action === "commit") bar.elements.msg.value = "";
+      // whatever you typed while it ran wins
+      else if (action === "message" && bar.elements.msg.value.trim() === message) bar.elements.msg.value = d.out;
+    }
+  } catch (e) { show(`git ${action} failed: ${e.message}`); }
+  btns.forEach(b => b.disabled = false);
+  fxLoad(sid);
+}
+
+function fxInfoHTML(r) {
+  const w = win(r), tk = (S.tasks?.list || []).find(x => x.session_id === r.sid), t = r.tx;
+  const { nrun, ndone } = agentCounts(r);
+  const rows = [
+    ["name", r.name], ["status", stateOf(r)[0].toLowerCase()], ["task", tk && `#${tk.id} ${tk.title}`], ["now", one(r.cur_task)],
+    ["model", String(r.model).replace("claude-", "")], ["context", `${fmt(r.ctx)}/${fmt(w)} · ${Math.min(100, r.ctx / w * 100).toFixed(0)}%`],
+    ["turns", r.turns], ["tools", r.tools], ["agents", nrun || ndone ? `${nrun} running · ${ndone} done` : ""],
+    ["in / out", `${fmt(r.inp)} / ${fmt(r.out)}`], ["cache", fmt(r.cread)], ["up", r.uptime], ["idle", r.updated ? ago(r.updated) : ""],
+    ["runs in", t.app], ["mode", t.perm], ["pid", r.pid], ["version", r.version], ["id", r.sid],
+  ];
+  return `<dl class="fx-kv">${rows.filter(x => x[1] || x[1] === 0).map(([k, v]) => `<dt>${k}</dt><dd title="${esc(v)}">${esc(v)}</dd>`).join("")}</dl>`;
+}
+
+function renderFocus(rows) {
+  if (rows.length && !rows.some(r => r.sid === sel)) sel = rows[0].sid;
+  const pick = $("fxSel"), opts = rows.map(r => [r.sid, `${r.name || r.sid.slice(0, 8)} · ${r.proj}`]), psig = JSON.stringify(opts);
+  if (pick._sig !== psig) { pick.replaceChildren(...opts.map(o => new Option(o[1], o[0]))); pick._sig = psig; }
+  if (document.activeElement !== pick && sel) pick.value = sel;
+  const r = rows.find(x => x.sid === sel);
+  if (!r) return;
+  if (r.sid !== fxSid) {
+    fxSid = r.sid; fxData = null; fxT = 0; $("fxCode")._sig = null; $("fxCode").innerHTML = "";
+    // a half-written message must not get committed to the next session's repo
+    $("fxGitBar").elements.msg.value = ""; $("fxGitOut").textContent = "";
+    // unsaved text stays open and still saves to its own session
+    if (!fxDirty()) { fxReq++; fxEdSet(null, ""); }
+    fxEdShow();
+  }
+  if (Date.now() - fxT > 5000) fxLoad(r.sid);
+  $("fxCodeSide").textContent = home(r.cwd);
+  const code = $("fxCode"), sig = fxData && JSON.stringify([fxData.files, fxData.more, fxData.err]);
+  if (fxData && code._sig !== sig) {
+    // a new file list must not collapse the folders you opened
+    const open = new Set([...code.querySelectorAll("details[open]")].map(d => d.dataset.path));
+    code.innerHTML = fxTreeHTML(fxData.files, open)
+      + (fxData.more ? `<div class="dim">only the first ${fxData.files.length} files are shown</div>` : "")
+      + (!fxData.files.length ? `<span class="dim">${esc(fxData.err || "no files")}</span>` : "");
+    code._sig = sig;
+  }
+  const git = fxData ? fxGitHTML(fxData) : "", info = fxInfoHTML(r);
+  $("fxGitBar").hidden = !fxData?.status;
+  if ($("fxGit")._html !== git) { $("fxGit").innerHTML = git; $("fxGit")._html = git; }
+  if ($("fxInfo")._html !== info) { $("fxInfo").innerHTML = info; $("fxInfo")._html = info; }
 }
 
 function txResize(sid, size) {
@@ -843,7 +1098,7 @@ function setTab(t) {
   tab = t;
   store.set("cs.tab", t);
   render();
-  if (t === "tx") poll(true);
+  if (t === "tx" || t === "focus") poll(true);
 }
 
 const F = n => $("tkForm").elements[n];
@@ -875,7 +1130,7 @@ async function tkUpdate(fields) {
 }
 
 function render() {
-  const onT = tab === "tasks", onX = tab === "tx";
+  const onT = tab === "tasks", onF = tab === "focus", onX = tab === "tx" || onF;
   $("tabs").querySelectorAll("[data-tab]").forEach(b => { b.classList.toggle("on", b.dataset.tab === tab); b.setAttribute("aria-pressed", String(b.dataset.tab === tab)); });
   if (!S) { renderHint(); return; }
   const rows = S.sessions;
@@ -886,7 +1141,9 @@ function render() {
   $("tiles").hidden = onT || onX || view !== "tiles";
   $("table").hidden = onT || onX || view !== "table";
   $("tasks").hidden = !onT;
-  $("txView").hidden = !onX;
+  // the focus view is the transcripts view with side panes: its CSS shows only the selected box
+  $("txView").hidden = !onX || (onF && !rows.length);
+  $("txView").classList.toggle("fx", onF);
   $("note").hidden = onT || onX;
   if (onX) renderTx();
   else if (!onT && view === "tiles") patch($("tiles"), rows.map(r => ({ key: r.sid, html: tileHTML(r) })));
@@ -925,9 +1182,11 @@ function renderHint() {
     : document.activeElement?.closest?.("#tkForm") ? "enter saves (⌘/ctrl-enter in the description) · esc cancels"
     : document.activeElement === $("tkNote") ? "enter saves the note · esc leaves"
     : document.activeElement?.classList?.contains("tx-input") ? "enter send · esc leave · ctrl-u clear line"
-    : tab === "tx" ? `1 sessions · 2 tasks · ←↑↓→ select · enter type · n new session · s size · shift+←→ move · f focus · a ${showAll ? "hide ended" : "show ended"} · / chat · r refresh`
+    : document.activeElement === $("fxEd") ? "⌘/ctrl-S save · tab indent · shift-tab outdent · esc leave"
+    : tab === "focus" ? `1 sessions · 2 tasks · 3 transcripts · ←→ switch session · enter type · f focus terminal · a ${showAll ? "hide ended" : "show ended"} · / chat · r refresh`
+    : tab === "tx" ? `1 sessions · 2 tasks · 4 focus · ←↑↓→ select · enter type · n new session · s size · shift+←→ move · f focus · a ${showAll ? "hide ended" : "show ended"} · / chat · r refresh`
     : tab === "tasks" ? `1 sessions · ↑↓ select · n new task · e edit · esc close · a ${tkShow === "all" ? "open only" : "show all"} · s scan inbox · m inbox log · / chat · r refresh`
-    : `←↑↓→ select · enter/click focus · 2 tasks · 3 transcripts · / chat · p projects · a ${showAll ? "hide ended" : "show ended"} · t ${view === "tiles" ? "table" : "tiles"} · r refresh${installPrompt ? " · i install app" : ""}`;
+    : `←↑↓→ select · enter/click focus · 2 tasks · 3 transcripts · 4 focus · / chat · p projects · a ${showAll ? "hide ended" : "show ended"} · t ${view === "tiles" ? "table" : "tiles"} · r refresh${installPrompt ? " · i install app" : ""}`;
   let h = esc(keys);
   if (flash[0] && Date.now() - flash[1] < 5000) h += `<span class="flash">▸ ${esc(flash[0])}</span>`;
   if (offline) h += `<span class="off">✗ server not reachable, retrying…</span>`;
@@ -1006,7 +1265,7 @@ async function poll(fresh) {
   polling = true;
   lastPoll = Date.now();
   try {
-    S = await api(`/api/state?all=${showAll ? 1 : 0}${fresh ? "&fresh=1" : ""}${tab === "tx" ? "&tx=1" : ""}`);
+    S = await api(`/api/state?all=${showAll ? 1 : 0}${fresh ? "&fresh=1" : ""}${tab === "tx" || tab === "focus" ? "&tx=1" : ""}`);
     offline = false;
     syncThemes();
     if (sel && !S.sessions.some(r => r.sid === sel)) sel = null;
@@ -1039,7 +1298,7 @@ function move(key) {
   const ids = tab === "tx" ? [...$("txs").children].map(el => el.dataset.sid) : rows.map(r => r.sid);
   let cur = ids.indexOf(sel);
   let per = 1;
-  if (tab === "tx" || view === "tiles") {
+  if (tab === "tx" || (tab !== "focus" && view === "tiles")) {
     const tiles = [...$(tab === "tx" ? "txs" : "tiles").children];
     per = Math.max(1, tiles.filter(t => t.offsetTop === tiles[0].offsetTop).length);
   }
@@ -1053,13 +1312,13 @@ function move(key) {
 document.addEventListener("keydown", e => {
   if (e.target.closest?.("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
   const k = e.key;
-  if (k === "1" || k === "2" || k === "3") { setTab({ 1: "sessions", 2: "tasks", 3: "tx" }[k]); return; }
-  if (tab === "tx") {
+  if (k === "1" || k === "2" || k === "3" || k === "4") { setTab({ 1: "sessions", 2: "tasks", 3: "tx", 4: "focus" }[k]); return; }
+  if (tab === "tx" || tab === "focus") {
     if (k === "Enter") { e.preventDefault(); document.querySelector(`.txbox[data-sid="${CSS.escape(sel || "")}"] input`)?.focus(); return; }
     if (k === "f" || k === "F") { e.preventDefault(); focusSel(); return; }
-    if (k === "n" || k === "N") { e.preventDefault(); $("txNew").elements.cwd.focus(); return; }
-    if (e.shiftKey && (k === "ArrowLeft" || k === "ArrowRight") && sel) { e.preventDefault(); const ids = [...$("txs").children].map(el => el.dataset.sid); txMove(sel, ids.indexOf(sel) + (k === "ArrowRight" ? 1 : -1)); return; }
-    if ((k === "s" || k === "S") && sel) { e.preventDefault(); txResize(sel, TX_SIZES[(TX_SIZES.indexOf(txSizes[sel] || "1x1") + 1) % TX_SIZES.length]); return; }
+    if (tab === "tx" && (k === "n" || k === "N")) { e.preventDefault(); $("txNew").elements.cwd.focus(); return; }
+    if (tab === "tx" && e.shiftKey && (k === "ArrowLeft" || k === "ArrowRight") && sel) { e.preventDefault(); const ids = [...$("txs").children].map(el => el.dataset.sid); txMove(sel, ids.indexOf(sel) + (k === "ArrowRight" ? 1 : -1)); return; }
+    if (tab === "tx" && (k === "s" || k === "S") && sel) { e.preventDefault(); txResize(sel, TX_SIZES[(TX_SIZES.indexOf(txSizes[sel] || "1x1") + 1) % TX_SIZES.length]); return; }
     if (k === " " || k === "t" || k === "T") return;
   }
   if (tab === "tasks") {
@@ -1099,6 +1358,8 @@ function openTx(sid) {
 }
 
 function pick(e) {
+  const fx = e.target.closest("[data-fx]");
+  if (fx) { sel = fx.closest("[data-sid]").dataset.sid; setTab("focus"); return; }
   const tx = e.target.closest("[data-tx]");
   if (tx) { openTx(tx.closest("[data-sid]").dataset.sid); return; }
   const el = e.target.closest("[data-sid]");
@@ -1163,6 +1424,7 @@ $("txs").addEventListener("click", e => {
   const act = e.target.closest("[data-act]")?.dataset.act, size = e.target.closest("[data-size]")?.dataset.size;
   if (size) txResize(sel, size);
   else if (act === "focus") focusSel();
+  else if (act === "fx") setTab("focus");
   else if (act === "allow" || act === "deny") txAct("/api/session/answer", { sid: sel, allow: act === "allow" });
   else if (act === "stop") txAct("/api/session/stop", { sid: sel });
   else render();
@@ -1215,6 +1477,51 @@ $("txs").addEventListener("keydown", e => {
 });
 $("txs").addEventListener("focusin", e => { const b = e.target.closest(".txbox"); if (b) { sel = b.dataset.sid; render(); } });
 $("txs").addEventListener("focusout", () => setTimeout(render));
+$("fxSel").addEventListener("change", e => { sel = e.target.value; e.target.blur(); render(); });
+$("fxCode").addEventListener("click", e => { const f = e.target.closest(".fx-file"); if (f && fxSid) fxOpen(fxSid, f.dataset.path); });
+// enter and space belong to the file or folder under focus, not to the page's shortcuts
+$("fxCode").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); });
+// pct is the chat's share of the chat + editor width; the two columns always add up to the 4fr they started with
+function fxSplitSet(pct) {
+  pct = Math.min(80, Math.max(20, Math.round(pct)));
+  $("txView").style.setProperty("--fx-chat", `${pct / 25}fr`);
+  $("txView").style.setProperty("--fx-ed", `${(100 - pct) / 25}fr`);
+  $("fxSplit").setAttribute("aria-valuenow", pct);
+  store.set("cs.fxsplit", pct);
+}
+fxSplitSet(Number(store.get("cs.fxsplit")) || 50);
+// no focus on click: the arrows must keep switching session after a drag
+$("fxSplit").addEventListener("mousedown", e => e.preventDefault());
+$("fxSplit").addEventListener("pointerdown", e => $("fxSplit").setPointerCapture(e.pointerId));
+$("fxSplit").addEventListener("pointermove", e => {
+  if (!$("fxSplit").hasPointerCapture(e.pointerId)) return;
+  const left = $("txs").getBoundingClientRect().left, right = $("fxSplit").parentElement.getBoundingClientRect().right;
+  fxSplitSet((e.clientX - left) / (right - left) * 100);
+});
+$("fxSplit").addEventListener("keydown", e => {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  e.preventDefault(); e.stopPropagation();
+  fxSplitSet(Number($("fxSplit").getAttribute("aria-valuenow")) + (e.key === "ArrowLeft" ? -5 : 5));
+});
+$("fxEdSave").addEventListener("click", () => fxSave());
+$("fxGitBar").addEventListener("submit", e => { e.preventDefault(); fxGitRun("commit"); });
+$("fxGitBar").addEventListener("click", e => { const b = e.target.closest("[data-git]"); if (b) fxGitRun(b.dataset.git); });
+$("fxEd").addEventListener("input", () => { fxEdShow(); fxEdPaint(); });
+$("fxEd").addEventListener("scroll", fxEdScroll);
+document.addEventListener("selectionchange", () => { if (document.activeElement === $("fxEd")) fxEdCursor(); });
+$("fxEd").addEventListener("keydown", e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); fxSave(); }
+  // execCommand keeps the undo stack; esc leaves the field, so tab is no keyboard trap
+  else if (e.key === "Tab" && !e.metaKey && !e.ctrlKey && !e.altKey && fxEdit) { e.preventDefault(); fxEdShift(e.target, e.shiftKey); }
+  // new lines keep the indentation, one level deeper after an opening bracket or a colon
+  else if (e.key === "Enter" && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.isComposing && fxEdit) {
+    e.preventDefault();
+    const v = e.target.value, a = e.target.selectionStart, line = v.slice(a ? v.lastIndexOf("\n", a - 1) + 1 : 0, a);
+    document.execCommand("insertText", false, "\n" + line.match(/^[ \t]*/)[0] + (/[{[(:]\s*$/.test(line) ? fxIndent(v) : ""));
+  }
+  else if (e.key === "Escape") e.target.blur();
+});
+window.addEventListener("beforeunload", e => { if (fxDirty()) e.preventDefault(); });
 $("tabs").addEventListener("click", e => {
   const b = e.target.closest("[data-tab]");
   if (b) setTab(b.dataset.tab);
