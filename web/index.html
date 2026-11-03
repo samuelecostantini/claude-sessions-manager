@@ -50,10 +50,13 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
 .tx-down { flex: none; align-self: center; position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; margin: -36px 0 8px; padding: 0; color: var(--fg); background: var(--surface, var(--bg)); border: 1px solid var(--gray); border-radius: 50%; box-shadow: 0 2px 6px rgb(0 0 0 / .25); transition: color .15s, border-color .15s; }
 .tx-down[hidden] { display: none; }
 .tx-down:hover, .tx-down:focus-visible { color: var(--orange); border-color: var(--orange); outline: 0; }
+.fx-nav { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.fx-nav .tk-btn { display: grid; place-items: center; width: 28px; height: 24px; padding: 0; }
+.fx-nav .ic { display: block; }
 .proj-row { flex: none; display: flex; align-items: center; gap: 2px; min-width: 0; }
 .proj-row .proj { flex: 1 1 auto; min-width: 0; }
-.proj-code { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; color: var(--dim); background: none; border: 0; border-radius: 4px; cursor: pointer; transition: color .15s; }
-.proj-code svg { width: 14px; height: 14px; }
+.proj-code { flex: none; display: grid; place-items: center; width: 18px; height: 18px; padding: 0; color: var(--dim); background: none; border: 0; border-radius: 4px; cursor: pointer; transition: color .15s; }
+.proj-code svg { width: 11px; height: 11px; }
 .proj-code:hover { color: var(--orange); }
 .proj-code:focus-visible { color: var(--orange); outline: 1px solid var(--orange); }
 .proj-opt { align-items: center; }
@@ -80,7 +83,7 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
     <div class="tiles" id="tiles"></div>
     <div class="tbl-wrap" id="table" hidden></div>
     <section class="tx-view" id="txView" aria-label="Transcripts" hidden>
-      <div class="tk-bar fx-only"><label class="tk-auto">Session <select id="fxSel" aria-label="Session"></select></label></div>
+      <div class="tk-bar fx-only"><label class="tk-auto">Session <select id="fxSel" aria-label="Session"></select></label><div class="fx-nav" id="fxNav" role="group" aria-label="Switch session"><button type="button" class="tk-btn" id="fxPrev" data-ic="left" data-key="ArrowLeft" title="Previous session (←)" aria-label="Previous session"></button><button type="button" class="tk-btn" id="fxNext" data-ic="right" data-key="ArrowRight" title="Next session (→)" aria-label="Next session"></button></div></div>
       <aside class="chat fx-pane fx-only" aria-label="Codebase"><div class="chat-head"><span class="chat-title">Files</span><span class="chat-side" id="fxCodeSide"></span></div><div class="chat-log fx-tree" id="fxCode"></div></aside>
       <div class="txs" id="txs"></div>
       <div class="fx-split fx-only" id="fxSplit" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize chat and editor" aria-valuemin="20" aria-valuemax="80" title="Drag to resize the chat and the editor"></div>
@@ -230,6 +233,8 @@ const ICONS = {
   rows: "M208,136H48a16,16,0,0,0-16,16v40a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,56H48V152H208v40Zm0-144H48A16,16,0,0,0,32,64v40a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V64A16,16,0,0,0,208,48Zm0,56H48V64H208v40Z",
   folder: "M216,72H130.67L102.93,51.2a16.12,16.12,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V200a16,16,0,0,0,16,16H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V64H93.33L123.2,86.4A8,8,0,0,0,128,88h88Z",
   down: "M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z",
+  left: "M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z",
+  right: "M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z",
   chat: "M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z",
 };
 const ph = (name, cls = "") => `<svg class="${cls}" viewBox="0 0 256 256" width="16" height="16" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="${ICONS[name]}"/></svg>`;
@@ -799,6 +804,8 @@ function renderFocus(rows) {
   const pick = $("fxSel"), opts = rows.map(r => [r.sid, `${r.name || r.sid.slice(0, 8)} · ${r.proj}`]), psig = JSON.stringify(opts);
   if (pick._sig !== psig) { pick.replaceChildren(...opts.map(o => new Option(o[1], o[0]))); pick._sig = psig; }
   if (document.activeElement !== pick && sel) pick.value = sel;
+  $("fxPrev").disabled = sel === rows[0]?.sid;
+  $("fxNext").disabled = sel === rows.at(-1)?.sid;
   const r = rows.find(x => x.sid === sel);
   if (!r) return;
   if (r.sid !== fxSid) {
@@ -1429,7 +1436,7 @@ async function send(text) {
 function move(key) {
   const rows = S?.sessions || [];
   if (!rows.length) return;
-  const ids = tab === "tx" ? [...$("txs").children].map(el => el.dataset.sid) : rows.map(r => r.sid);
+  const ids = tab === "tx" || tab === "focus" ? [...$("txs").children].map(el => el.dataset.sid) : rows.map(r => r.sid);
   let cur = ids.indexOf(sel);
   let per = 1;
   if (tab === "tx" || (tab !== "focus" && view === "tiles")) {
@@ -1642,6 +1649,9 @@ $("txs").addEventListener("keydown", e => {
 $("txs").addEventListener("focusin", e => { const b = e.target.closest(".txbox"); if (b) { sel = b.dataset.sid; render(); } });
 $("txs").addEventListener("focusout", () => setTimeout(render));
 $("fxSel").addEventListener("change", e => { sel = e.target.value; e.target.blur(); render(); });
+// no focus on click: space and enter must keep their page shortcuts
+$("fxNav").addEventListener("mousedown", e => e.preventDefault());
+$("fxNav").addEventListener("click", e => { const b = e.target.closest("[data-key]"); if (b) move(b.dataset.key); });
 $("fxCode").addEventListener("click", e => { const f = e.target.closest(".fx-file"); if (f && fxSid) fxOpen(fxSid, f.dataset.path); });
 // enter and space belong to the file or folder under focus, not to the page's shortcuts
 $("fxCode").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); });
