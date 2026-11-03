@@ -1,7 +1,8 @@
 # Same trick as test_session_file.py: pull session_git out of the script. Run: python3 tests/test_session_git.py
-import os, re, shutil, subprocess, tempfile  # shutil also used by git_message
+import os, re, shutil, subprocess, tempfile  # shutil also used by claude_bin
 
 src = open(os.path.join(os.path.dirname(__file__), "..", "claude-sessions"), encoding="utf-8").read()
+exec(re.search(r"^def claude_bin\(.*?(?=^TR_HOME)", src, re.S | re.M).group(0))
 exec(re.search(r"^def git_message\(.*?(?=^def session_file)", src, re.S | re.M).group(0))
 
 tmp = tempfile.mkdtemp()

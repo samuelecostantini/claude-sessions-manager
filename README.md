@@ -54,10 +54,10 @@ on disk, saving asks before overwriting.
 ### Sessions run by cs
 
 `cs` can run sessions itself, with no terminal: `claude -p` in stream-json mode, with its permission
-prompts sent to the dashboard (`--permission-prompt-tool stdio`). Start one with `new session in` above
-the boxes on the web (folder, permission mode, optional first message), or `n` in the TUI (pick the
-folder in the projects search). Task sessions can run this way too: pick `dashboard (cs)` in the Tasks
-bar's `sessions in`, and Analyze starts the session in plan mode inside cs.
+prompts sent to the dashboard (`--permission-prompt-tool stdio`). Start one with `New Session` in the
+web toolbar or `n` (folder, permission mode, optional first message), or `n` in the TUI (pick the
+folder in the projects search). Task sessions can run this way too: pick `This dashboard` under
+`Task sessions open in` in Settings, and Analyze starts the session inside cs.
 
 When Claude asks to use a tool, or posts a plan, the box shows it with `allow`/`approve` and `deny`
 (`y` and `d` in the TUI). Typing a reply instead denies it with your message, which is how you comment
@@ -128,7 +128,8 @@ startup, so other websites can't drive the chat (which runs with permissions byp
 `cs -w`, `w` and the `open web view ↗` link open the installed app instead of a browser tab when
 there is one for the same port (Chrome, Edge or Brave apps in `~/Applications`).
 
-Keys: arrows select, Enter or click focuses the session's app, `/` opens the chat (Esc closes),
+Click selects a session; Enter or a double-click brings its app to the front. `?` lists the keys of the
+current view, `,` opens Settings, `n` starts a session or task. `/` opens the chat (Esc closes),
 `p` searches projects, `a` toggles ended sessions, `t` switches between tiles and the table layout, `r` refreshes,
 `1`, `2`, `3` and `4` switch between sessions, [tasks](#tasks), [transcripts](#transcripts) and [focus](#focus).
 
@@ -141,15 +142,17 @@ reloads itself when the server is back.
 
 ### Themes
 
-Pick a theme from the select in the top-right corner. Themes are listed in `.settings.json`,
-which also stores the selected one (the select writes it back; editing the file by hand works too,
+Pick a theme in Settings (the gear in the toolbar, or `,`). `Native` is the default: a macOS-style
+window with a sidebar and sheets that follows the system's light or dark mode. Themes are listed in `.settings.json`,
+which also stores the selected one (Settings writes it back; editing the file by hand works too,
 it is read on every request):
 
 ```json
 {
   "projects": "~/Projects",
-  "theme": "terminal",
+  "theme": "native",
   "themes": [
+    { "id": "native", "title": "Native", "file": "Native-theme.css" },
     { "id": "terminal", "title": "Terminal", "file": "Terminal-theme.css" },
     { "id": "claude", "title": "Claude", "file": "Claude-theme.css" }
   ]
@@ -168,9 +171,8 @@ tokens listed at the top of `Terminal-theme.css`.
 
 The line above the chat lists the git repos you used most recently with Claude (from
 `~/.claude/projects`); click one to open it in VS Code. `p` searches all repos in the projects
-folder: type to filter, arrows select, Enter opens, Esc closes. In the web view the line is a row
-of chips with a search box; the folder at its right end shows the projects folder, click it to
-change it.
+folder: type to filter, arrows select, Enter opens, Esc closes. In the web view they are in the sidebar
+with a search box (older themes show a row of chips); the projects folder is set in Settings.
 
 The projects folder is `projects` in `.settings.json` (default `~/Projects`, colon-separate several).
 Repos are found up to three levels deep. `CS_REPO_ROOTS`, if set, overrides it. Projects open
@@ -202,19 +204,25 @@ Tasks live in `~/.claude/state/cs-tasks.db` (SQLite, or `$CS_TASKS_DB`).
 ### Working a task with Claude
 
 `analyze` in a task's detail opens a new terminal tab or window running an interactive `claude` session in the
-task's repo, in plan mode, with the task (and its email, marked as third-party data) as the first prompt.
+task's repo, with the task (and its email, marked as third-party data) as the first prompt. The select next to
+the button sets the permission mode, for `resume session` too. It defaults to `Skip all permissions`
+(`bypassPermissions`), so nothing stops the session from running any command, including on a task built from
+an email: pick `Plan first` for read-only analysis enforced by Claude Code.
 It shows up in the sessions view like any other session, its tile tagged `task #N`, and `focus session`
 brings its tab forward. The task follows the session by reading its transcript:
 
 | Status       | When                                                                                     |
 |--------------|------------------------------------------------------------------------------------------|
-| analyzing    | the session is investigating, read-only                                                  |
+| analyzing    | the session is investigating; it is told to change nothing, enforced only in `Plan first` |
 | to approve   | Claude posted its plan (findings, for a check): approve or comment in its tab            |
 | implementing | you approved: it creates a worktree on `task/<id>-<slug>`, implements, tests and commits |
 | to review    | it ended its report with `[task #N ready for review]`                                    |
 | failed       | the session ended before posting a plan                                                  |
 
-Rejecting or commenting on the plan sends the task back to analyzing until the next plan. The detail shows
+Without plan mode Claude has no `ExitPlanMode`, so it ends the plan with `[task #N plan ready]` and waits. Any
+reply then moves the task to implementing, and a revised plan moves it back to to approve.
+
+In `Plan first`, rejecting or commenting on the plan sends the task back to analyzing until the next plan. The detail shows
 the plan, the final report, and the branch's worktree, commits and diff stat; `open in VS Code` opens the
 worktree once it exists. Nothing is pushed, merged or deployed and no email is sent: you review the branch
 and merge it yourself, then mark the task done. `resume session` reopens an ended session in the chosen terminal;
@@ -222,7 +230,7 @@ and merge it yourself, then mark the task done. `resume session` reopens an ende
 
 ![Task detail](assets/task-detail.png)
 
-`sessions in` in the Tasks bar picks the terminal for these sessions, from the ones installed (Terminal,
+`Task sessions open in` in Settings picks the terminal for these sessions, from the ones installed (Terminal,
 iTerm, Warp, Ghostty, kitty, Alacritty, WezTerm); it is saved as `terminal` in `.settings.json` and
 defaults to Terminal. Warp gets the session's script as a `.command` file to run; only Terminal and
 iTerm can select the exact tab on `focus session`, the others are brought to the front.
@@ -231,8 +239,8 @@ iTerm can select the exact tab on `focus session`, the others are brought to the
 
 The inbox scan reads your Gmail inbox through the Gmail connector of your Claude account and turns
 emails that ask for work on a project in the projects folder into tasks (marked `✉`). It runs every 15
-minutes while `cs`, `cs -s` or `cs -w` serves the web view, and on demand with `scan inbox` (or `s`).
-The `auto every … min` controls in the tasks tab switch the timer off or change it; they are saved as
+minutes while `cs`, `cs -s` or `cs -w` serves the web view, and on demand with `Scan Inbox` (or `s`).
+The `Inbox` controls in Settings switch the timer off or change it; they are saved as
 `inbox` in `.settings.json`:
 
 ```json
@@ -252,7 +260,7 @@ reply, forward, drafts, labels, trash, spam) is denied, any MCP tool your settin
 and anything else is refused without asking. It never changes your mailbox. A scan with no new mail takes
 seconds and costs a fraction of a cent; the first one, over two weeks of mail, costs around $0.20 to $0.40.
 
-`inbox log` (or `m`) lists every thread the scans looked at, what they decided and why, with a link to
+`Inbox Log` (or `m`) lists every thread the scans looked at, what they decided and why, with a link to
 Gmail. The scan learns from your corrections, which it reads as examples on every run:
 
 - `make task` on a skipped thread creates the task and tells later scans that mail like it is a task;

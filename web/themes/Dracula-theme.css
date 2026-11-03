@@ -591,3 +591,7 @@ kbd { font: inherit; color: var(--fg); }
   .fx-split { display: none; }
   .fx-right { grid-template-rows: none; }
 }
+
+/* the star left the markup when the Native theme arrived */
+.brand::before, .chat-title::before { content: "✻ "; }
+.tile-tx svg, .proj svg { flex: none; }

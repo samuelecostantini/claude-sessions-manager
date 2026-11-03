@@ -3,86 +3,94 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Claude sessions</title>
+<title>Claude Sessions</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-<meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#f4f4f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-title" content="Sessions">
 <meta name="mobile-web-app-capable" content="yes">
+<style>
+/* shared by every theme, which loads after this and can override it */
+.ic, .nv-only { display: none; }
+.top-acts { flex: none; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+dialog.sheet { width: min(480px, 92vw); max-height: 86dvh; overflow: auto; padding: 20px; color: var(--fg); background: var(--surface, var(--bg)); border: 1px solid var(--gray); border-radius: 12px; }
+dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
+.sheet h2 { margin: 0 0 16px; font-size: 15px; font-weight: 600; }
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.field > span:first-child { font-weight: 500; }
+.field-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sheet input:not([type=checkbox]), .sheet select, .sheet textarea { min-width: 0; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--gray); border-radius: 6px; padding: 5px 8px; }
+.help { color: var(--dim); font-size: 12px; }
+.help.err, .sheet .tk-err { color: var(--red); }
+.sheet-acts { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 18px; }
+.sheet-acts .tk-err { margin-right: auto; }
+.keys-list { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; margin: 0; }
+.keys-list dt { font-family: var(--mono, monospace); font-size: 12px; white-space: nowrap; }
+.keys-list dd { margin: 0; color: var(--dim); }
+.keys-list dd::first-letter { text-transform: uppercase; }
+</style>
 <link id="theme-css" rel="stylesheet" href="__CS_THEME__">
 </head>
 <body>
-<div class="app">
-  <header class="top"><div class="top-info" id="head"><span class="brand">✻ Claude sessions</span></div>
-    <nav class="tabs" id="tabs" aria-label="View"><button type="button" data-tab="sessions">sessions</button><button type="button" data-tab="tasks">tasks <span class="tab-n" id="tabN"></span></button><button type="button" data-tab="tx">transcripts</button><button type="button" data-tab="focus">focus</button></nav>
-    <label class="theme-pick"><span>theme</span><select id="theme" aria-label="Theme"></select></label></header>
+<div class="app" id="app">
+  <header class="top">
+    <button type="button" class="tk-btn ic-btn nv-only" id="sideBtn" data-ic="sidebar" title="Show or hide the sidebar" aria-label="Show or hide the sidebar"></button>
+    <div class="top-info" id="head"><span class="brand">Claude sessions</span></div>
+    <nav class="tabs" id="tabs" aria-label="View"><button type="button" data-tab="sessions" data-ic="squares" title="Sessions (1)"><span>Sessions</span></button><button type="button" data-tab="tasks" data-ic="tasks" title="Tasks (2)"><span>Tasks</span><span class="tab-n" id="tabN"></span></button><button type="button" data-tab="tx" data-ic="chats" title="Transcripts (3)"><span>Transcripts</span></button><button type="button" data-tab="focus" data-ic="corners" title="Focus (4)"><span>Focus</span></button></nav>
+    <div class="top-acts">
+      <label class="tk-auto" id="endedWrap" title="Include sessions ended in the last 24 hours (a)"><input type="checkbox" id="ended"> Show ended</label>
+      <div class="tk-seg" id="viewSeg" role="group" aria-label="Layout"><button type="button" data-view="tiles" data-ic="squares" title="Grid (t)" aria-label="Grid"><span class="ic-lab">grid</span></button><button type="button" data-view="table" data-ic="rows" title="List (t)" aria-label="List"><span class="ic-lab">list</span></button></div>
+      <button type="button" class="tk-btn primary" id="topNew" title="n">New Session</button>
+      <button type="button" class="tk-btn ic-btn" id="setBtn" data-ic="gear" title="Settings (,)" aria-label="Settings"><span class="ic-lab">Settings</span></button>
+      <button type="button" class="tk-btn ic-btn" id="helpBtn" data-ic="question" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><span class="ic-lab">Shortcuts</span></button>
+    </div>
+  </header>
   <main class="body" id="main">
     <div class="tiles" id="tiles"></div>
     <div class="tbl-wrap" id="table" hidden></div>
     <section class="tx-view" id="txView" aria-label="Transcripts" hidden>
-      <form class="tk-bar tx-new" id="txNew" autocomplete="off">
-        <span class="dim">new session in</span>
-        <input name="cwd" list="txDirs" placeholder="project folder" spellcheck="false" aria-label="Project folder" required>
-        <select name="mode" aria-label="Permission mode"><option value="default">ask before tools</option><option value="plan">plan first</option><option value="acceptEdits">accept edits</option><option value="bypassPermissions">skip all permissions</option></select>
-        <input name="text" class="tx-first" placeholder="first message (optional)" spellcheck="false" aria-label="First message">
-        <button type="submit" class="tk-btn primary">start</button>
-        <datalist id="txDirs"></datalist>
-      </form>
-      <div class="tk-bar fx-only"><label class="tk-auto">session <select id="fxSel" aria-label="Session"></select></label></div>
-      <aside class="chat fx-pane fx-only" aria-label="Codebase"><div class="chat-head"><span class="chat-title">✻ codebase</span><span class="chat-side" id="fxCodeSide"></span></div><div class="chat-log fx-tree" id="fxCode"></div></aside>
+      <div class="tk-bar fx-only"><label class="tk-auto">Session <select id="fxSel" aria-label="Session"></select></label></div>
+      <aside class="chat fx-pane fx-only" aria-label="Codebase"><div class="chat-head"><span class="chat-title">Files</span><span class="chat-side" id="fxCodeSide"></span></div><div class="chat-log fx-tree" id="fxCode"></div></aside>
       <div class="txs" id="txs"></div>
-      <aside class="chat fx-pane fx-ed fx-only" aria-label="File editor"><div class="fx-split" id="fxSplit" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize chat and editor" aria-valuemin="20" aria-valuemax="80" title="drag to resize the chat and the editor"></div><div class="chat-head"><span class="chat-title">✻ editor</span><span class="chat-side" id="fxEdPath"></span><button type="button" class="tk-btn" id="fxEdSave" title="save (⌘/ctrl-S)" disabled>save</button></div><div class="fx-editor" id="fxEdWrap"><pre class="fx-nums" id="fxEdNums" aria-hidden="true"></pre><div class="fx-edmain"><div class="fx-curline" id="fxEdLine" hidden></div><pre class="fx-hl" id="fxEdHl" aria-hidden="true"></pre><textarea id="fxEd" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File contents" placeholder="click a file in the codebase to open it here" readonly></textarea></div></div></aside>
+      <aside class="chat fx-pane fx-ed fx-only" aria-label="File editor"><div class="fx-split" id="fxSplit" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize chat and editor" aria-valuemin="20" aria-valuemax="80" title="Drag to resize the chat and the editor"></div><div class="chat-head"><span class="chat-title">Editor</span><span class="chat-side" id="fxEdPath"></span><button type="button" class="tk-btn" id="fxEdSave" title="Save (⌘/ctrl-S)" disabled>Save</button></div><div class="fx-editor" id="fxEdWrap"><pre class="fx-nums" id="fxEdNums" aria-hidden="true"></pre><div class="fx-edmain"><div class="fx-curline" id="fxEdLine" hidden></div><pre class="fx-hl" id="fxEdHl" aria-hidden="true"></pre><textarea id="fxEd" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File contents" placeholder="Click a file to open it here" readonly></textarea></div></div></aside>
       <div class="fx-right fx-only">
-        <aside class="chat fx-pane" aria-label="Git status"><div class="chat-head"><span class="chat-title">✻ git status</span></div><form class="fx-git" id="fxGitBar" hidden><input name="msg" placeholder="commit message" aria-label="Commit message" spellcheck="false" autocomplete="off"><button type="button" class="tk-btn" data-git="message" title="write the message with Claude, from what commit would take: it reads the diff">generate</button><button type="submit" class="tk-btn" title="commit what is staged, or every change if nothing is staged">commit</button><button type="button" class="tk-btn" data-git="push">push</button><button type="button" class="tk-btn" data-git="fetch">fetch</button><div class="fx-git-out" id="fxGitOut" role="status"></div></form><div class="chat-log" id="fxGit"></div></aside>
-        <aside class="chat fx-pane" aria-label="Session information"><div class="chat-head"><span class="chat-title">✻ session</span></div><div class="chat-log" id="fxInfo"></div></aside>
+        <aside class="chat fx-pane" aria-label="Git status"><div class="chat-head"><span class="chat-title">Git Status</span></div><form class="fx-git" id="fxGitBar" hidden><input name="msg" placeholder="Commit message" aria-label="Commit message" spellcheck="false" autocomplete="off"><button type="button" class="tk-btn" data-git="message" title="Write the message with Claude, from what commit would take: it reads the diff">Generate</button><button type="submit" class="tk-btn" title="Commit what is staged, or every change if nothing is staged">Commit</button><button type="button" class="tk-btn" data-git="push">Push</button><button type="button" class="tk-btn" data-git="fetch">Fetch</button><div class="fx-git-out" id="fxGitOut" role="status"></div></form><div class="chat-log" id="fxGit"></div></aside>
+        <aside class="chat fx-pane" aria-label="Session information"><div class="chat-head"><span class="chat-title">Session</span></div><div class="chat-log" id="fxInfo"></div></aside>
       </div>
     </section>
     <section class="tasks" id="tasks" aria-label="Tasks" hidden>
       <div class="tk-bar">
-        <button type="button" class="tk-btn primary" id="tkNew">+ new task</button>
-        <div class="tk-seg" id="tkShow">show <button type="button" data-show="open">open</button><span class="dim">·</span><button type="button" data-show="all">all</button></div>
+        <div class="tk-seg" id="tkShow" role="group" aria-label="Show"><button type="button" data-show="open">Open</button><button type="button" data-show="all">All</button></div>
         <span class="tk-sum" id="tkSum"></span>
         <div class="tk-inbox">
           <span class="tk-scan" id="tkScanInfo"></span>
-          <label class="tk-auto" title="scan the inbox automatically while cs runs"><input type="checkbox" id="tkAuto"> auto every <select id="tkEvery" aria-label="Minutes between scans"><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="30">30</option><option value="60">60</option></select> min</label>
-          <label class="tk-auto" title="where analyze and resume open the Claude session">sessions in <select id="tkTerm" aria-label="Terminal for task sessions"></select></label>
-          <button type="button" class="tk-btn" id="tkMail">inbox log</button>
-          <button type="button" class="tk-btn" id="tkScan">scan inbox</button>
+          <button type="button" class="tk-btn" id="tkMail" title="m">Inbox Log</button>
+          <button type="button" class="tk-btn" id="tkScan" title="s">Scan Inbox</button>
         </div>
       </div>
       <section class="tk-mail" id="tkMailBox" aria-label="Inbox log" hidden>
-        <div class="tk-mail-hd"><span class="tk-mail-title">inbox log</span><span class="tk-mail-sub" id="tkMailSub"></span><button type="button" class="tk-x" id="tkMailClose" title="close (m)" aria-label="Close">✕</button></div>
+        <div class="tk-mail-hd"><span class="tk-mail-title">Inbox Log</span><span class="tk-mail-sub" id="tkMailSub"></span><button type="button" class="tk-x" id="tkMailClose" title="Close (m)" aria-label="Close">✕</button></div>
         <div class="tk-mail-list" id="tkMailList"></div>
       </section>
-      <form class="tk-form" id="tkForm" autocomplete="off" hidden>
-        <div class="tk-form-head" id="tkFormHead">new task</div>
-        <label class="f-title"><span>title</span><input name="title" maxlength="200" spellcheck="false"></label>
-        <label class="f-proj"><span>project</span><input name="project" list="tkProjects" placeholder="client/repo, or just the client" spellcheck="false"></label>
-        <label><span>kind</span><select name="kind"><option value="fix">fix · change code</option><option value="check">check · investigate</option></select></label>
-        <label><span>priority</span><select name="priority"><option value="">none</option><option value="high">high</option><option value="medium">medium</option><option value="low">low</option></select></label>
-        <label class="f-sum"><span>description</span><textarea name="summary" rows="5"></textarea></label>
-        <div class="tk-form-acts"><button type="submit" class="tk-btn primary">save</button><button type="button" class="tk-btn" id="tkCancel">cancel</button><span class="tk-err" id="tkErr"></span></div>
-        <datalist id="tkProjects"></datalist>
-      </form>
       <div class="tk-wrap" id="tkWrap">
         <div class="tk-list" id="tkList"></div>
         <aside class="tk-detail" id="tkDetail" aria-label="Task" hidden>
           <div id="tkInfo"></div>
           <div class="tk-ctl">
-            <label>status <select id="tkStatus"></select></label>
-            <label>priority <select id="tkPrio"><option value="">none</option><option value="high">high</option><option value="medium">medium</option><option value="low">low</option></select></label>
-            <label>kind <select id="tkKind"><option value="fix">fix</option><option value="check">check</option></select></label>
+            <label>Status <select id="tkStatus"></select></label>
+            <label>Priority <select id="tkPrio"><option value="">None</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+            <label>Kind <select id="tkKind"><option value="fix">Fix</option><option value="check">Check</option></select></label>
           </div>
           <div class="tk-acts">
-            <button type="button" class="tk-btn" id="tkEdit">edit</button>
-            <button type="button" class="tk-btn" id="tkSub">+ subtask</button>
-            <button type="button" class="tk-btn" id="tkOpen">open in VS Code</button>
-            <button type="button" class="tk-btn" id="tkDismiss" title="reject it and teach the inbox scan that mail like this is not a task">not a task</button>
-            <button type="button" class="tk-btn danger" id="tkDel">delete</button>
+            <button type="button" class="tk-btn" id="tkEdit">Edit</button>
+            <button type="button" class="tk-btn" id="tkSub">Add Subtask</button>
+            <button type="button" class="tk-btn" id="tkOpen">Open in VS Code</button>
+            <button type="button" class="tk-btn" id="tkDismiss" title="Reject it and teach the inbox scan that mail like this is not a task">Not a Task</button>
+            <button type="button" class="tk-btn danger" id="tkDel">Delete</button>
           </div>
-          <input class="tk-note" id="tkNote" autocomplete="off" spellcheck="false" placeholder="add a note · enter saves" aria-label="Add a note">
+          <input class="tk-note" id="tkNote" autocomplete="off" spellcheck="false" placeholder="Add a note and press Enter" aria-label="Add a note">
           <div class="tk-log" id="tkLog"></div>
         </aside>
       </div>
@@ -92,14 +100,12 @@
   </main>
   <footer class="dock">
     <nav class="projects" id="projects" aria-label="Projects">
-      <span class="proj-label">projects</span>
+      <span class="proj-label">Projects</span>
+      <div class="proj-find"><input id="projQ" autocomplete="off" spellcheck="false" placeholder="Search projects" title="p" aria-label="Search projects"><div class="proj-menu" id="projMenu" role="listbox" hidden></div></div>
       <div class="proj-list" id="projList"></div>
-      <div class="proj-find"><input id="projQ" autocomplete="off" spellcheck="false" placeholder="search projects (p)" aria-label="Search projects"><div class="proj-menu" id="projMenu" role="listbox" hidden></div></div>
-      <button class="proj-dir" id="projDir" type="button"></button>
-      <input class="proj-dir-in" id="projDirIn" autocomplete="off" spellcheck="false" aria-label="Projects folder" hidden>
     </nav>
     <section class="chat" id="chat" aria-label="Ask Claude">
-      <div class="chat-head"><span class="chat-title">✻ Ask Claude</span><span class="chat-side" id="chatSide"></span></div>
+      <div class="chat-head"><span class="chat-title">Ask Claude</span><span class="chat-side" id="chatSide"></span></div>
       <div class="chat-log" id="chatLog" hidden></div>
       <div class="chat-field"><span class="p">❯</span><input id="ask" autocomplete="off" spellcheck="false" aria-label="Ask Claude"></div>
     </section>
@@ -107,6 +113,43 @@
     <div class="hint" id="hint"></div>
   </footer>
 </div>
+<dialog class="sheet" id="setDlg" aria-labelledby="setT">
+  <h2 id="setT">Settings</h2>
+  <label class="field"><span>Theme</span><select id="theme"></select></label>
+  <label class="field"><span>Projects folder</span><input id="projDirIn" autocomplete="off" spellcheck="false"><span class="help" id="projDirHelp"></span></label>
+  <label class="field"><span>Task sessions open in</span><select id="tkTerm"></select></label>
+  <div class="field"><span>Inbox</span><div class="field-row"><label class="field-row"><input type="checkbox" id="tkAuto"> Scan automatically every</label><select id="tkEvery" aria-label="Minutes between scans"><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="30">30</option><option value="60">60</option></select> minutes</div></div>
+  <div class="sheet-acts"><button type="button" class="tk-btn primary" data-close>Done</button></div>
+</dialog>
+<dialog class="sheet" id="keysDlg" aria-labelledby="keysT">
+  <h2 id="keysT">Keyboard Shortcuts</h2>
+  <dl class="keys-list" id="keysList"></dl>
+  <div class="sheet-acts"><button type="button" class="tk-btn primary" data-close>Done</button></div>
+</dialog>
+<dialog class="sheet" id="txDlg" aria-labelledby="txT">
+  <form id="txNew" autocomplete="off">
+    <h2 id="txT">New Session</h2>
+    <label class="field"><span>Project folder</span><input name="cwd" list="txDirs" spellcheck="false" required></label>
+    <label class="field"><span>Permissions</span><select name="mode"><option value="default">Ask before tools</option><option value="plan">Plan first</option><option value="acceptEdits">Accept edits</option><option value="bypassPermissions">Skip all permissions</option></select></label>
+    <label class="field"><span>First message (optional)</span><input name="text" class="tx-first" spellcheck="false"></label>
+    <datalist id="txDirs"></datalist>
+    <div class="sheet-acts"><span class="tk-err" id="txErr" role="alert"></span><button type="button" class="tk-btn" data-close>Cancel</button><button type="submit" class="tk-btn primary">Start Session</button></div>
+  </form>
+</dialog>
+<dialog class="sheet" id="tkDlg" aria-labelledby="tkFormHead">
+  <form id="tkForm" autocomplete="off">
+    <h2 id="tkFormHead">New Task</h2>
+    <label class="field"><span>Title</span><input name="title" maxlength="200" spellcheck="false"></label>
+    <label class="field"><span>Project</span><input name="project" list="tkProjects" spellcheck="false"><span class="help">A client/repo, or just the client.</span></label>
+    <div class="field-row sheet-2">
+      <label class="field"><span>Kind</span><select name="kind"><option value="fix">Fix (change code)</option><option value="check">Check (investigate)</option></select></label>
+      <label class="field"><span>Priority</span><select name="priority"><option value="">None</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+    </div>
+    <label class="field"><span>Description</span><textarea name="summary" rows="5"></textarea></label>
+    <datalist id="tkProjects"></datalist>
+    <div class="sheet-acts"><span class="tk-err" id="tkErr" role="alert"></span><button type="button" class="tk-btn" id="tkCancel">Cancel</button><button type="submit" class="tk-btn primary">Save</button></div>
+  </form>
+</dialog>
 <script>
 "use strict";
 const TOKEN = "__CS_TOKEN__";
@@ -117,7 +160,8 @@ const TIP = "open a repo in VS Code, show it in Finder…";
 const SHORT = { "general-purpose": "general", "claude-code-guide": "guide", "statusline-setup": "statusline" };
 const RM = matchMedia("(prefers-reduced-motion: reduce)");
 const $ = id => document.getElementById(id);
-const ask = $("ask");
+const ask = $("ask"), dirIn = $("projDirIn");
+let dirErr = "";
 
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -144,8 +188,22 @@ try { txSizes = JSON.parse(store.get("cs.txsize") || "{}") || {}; } catch {}
 try { txOrder = JSON.parse(store.get("cs.txorder") || "[]") || []; } catch {}
 const TX_SIZES = ["1x1", "2x1", "2x2", "full", "full2"];
 const txSizeName = z => z === "full" ? "full width" : z === "full2" ? "full width, 2 rows" : `${z.replace("x", "×")} (columns × rows)`;
-const FX_ICON = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3"/></svg>`;
-const CHAT_ICON = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2.5 2.5h11a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7.5l-3.5 2.5v-2.5H2.5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z"/><path d="M4.5 5.5h7M4.5 8h4.5"/></svg>`;
+// Phosphor Icons (regular, MIT). The inline style beats the older themes' stroke-only icon rules.
+const ICONS = {
+  squares: "M104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48Z",
+  tasks: "M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM224,48V208a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48ZM208,208V48H48V208H208Z",
+  chats: "M232.07,186.76a80,80,0,0,0-62.5-114.17A80,80,0,1,0,23.93,138.76l-7.27,24.71a16,16,0,0,0,19.87,19.87l24.71-7.27a80.39,80.39,0,0,0,25.18,7.35,80,80,0,0,0,108.34,40.65l24.71,7.27a16,16,0,0,0,19.87-19.86ZM62,159.5a8.28,8.28,0,0,0-2.26.32L32,168l8.17-27.76a8,8,0,0,0-.63-6,64,64,0,1,1,26.26,26.26A8,8,0,0,0,62,159.5Zm153.79,28.73L224,216l-27.76-8.17a8,8,0,0,0-6,.63,64.05,64.05,0,0,1-85.87-24.88A79.93,79.93,0,0,0,174.7,89.71a64,64,0,0,1,41.75,92.48A8,8,0,0,0,215.82,188.23Z",
+  corners: "M216,48V88a8,8,0,0,1-16,0V56H168a8,8,0,0,1,0-16h40A8,8,0,0,1,216,48ZM88,200H56V168a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H88a8,8,0,0,0,0-16Zm120-40a8,8,0,0,0-8,8v32H168a8,8,0,0,0,0,16h40a8,8,0,0,0,8-8V168A8,8,0,0,0,208,160ZM88,40H48a8,8,0,0,0-8,8V88a8,8,0,0,0,16,0V56H88a8,8,0,0,0,0-16Z",
+  gear: "M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A112.1,112.1,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.62a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.08,8.08,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8.08,8.08,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z",
+  question: "M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11,10.77-20,24-20s24,9,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm104,56A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z",
+  sidebar: "M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM40,56H80V200H40ZM216,200H96V56H216V200Z",
+  rows: "M208,136H48a16,16,0,0,0-16,16v40a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,56H48V152H208v40Zm0-144H48A16,16,0,0,0,32,64v40a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V64A16,16,0,0,0,208,48Zm0,56H48V64H208v40Z",
+  folder: "M216,72H130.67L102.93,51.2a16.12,16.12,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V200a16,16,0,0,0,16,16H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V64H93.33L123.2,86.4A8,8,0,0,0,128,88h88Z",
+  chat: "M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z",
+};
+const ph = (name, cls = "") => `<svg class="${cls}" viewBox="0 0 256 256" width="16" height="16" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="${ICONS[name]}"/></svg>`;
+const FX_ICON = ph("corners"), CHAT_ICON = ph("chat");
+document.querySelectorAll("[data-ic]").forEach(el => el.insertAdjacentHTML("afterbegin", ph(el.dataset.ic, "ic")));
 // a 2×2 grid with the cells the size covers filled in; full width is one bar across the top (both rows for full2)
 const txIcon = z => {
   const [w, h] = z.split("x").map(Number);
@@ -156,17 +214,18 @@ const txIcon = z => {
 };
 let mailOpen = false, mailData = null, mailKey = "", mailSig = "", scanSig = "";
 
+const VIEWS = { sessions: "Sessions", tasks: "Tasks", tx: "Transcripts", focus: "Focus" };
 const TS = {
-  new: ["new", "var(--fg)", "○"],
-  queued: ["queued", "var(--wait)", "◌"],
-  analyzing: ["analyzing", "var(--orange)", ""],
-  awaiting_approval: ["to approve", "var(--amber)", "◆"],
-  implementing: ["implementing", "var(--orange)", ""],
-  in_review: ["to review", "var(--amber)", "◆"],
-  needs_info: ["needs info", "var(--violet)", "?"],
-  done: ["done", "var(--green)", "✓"],
-  rejected: ["rejected", "var(--gray)", "■"],
-  failed: ["failed", "var(--red)", "✗"],
+  new: ["New", "var(--fg)", "○"],
+  queued: ["Queued", "var(--wait)", "◌"],
+  analyzing: ["Analyzing", "var(--orange)", ""],
+  awaiting_approval: ["To approve", "var(--amber)", "◆"],
+  implementing: ["Implementing", "var(--orange)", ""],
+  in_review: ["To review", "var(--amber)", "◆"],
+  needs_info: ["Needs info", "var(--violet)", "?"],
+  done: ["Done", "var(--green)", "✓"],
+  rejected: ["Rejected", "var(--gray)", "■"],
+  failed: ["Failed", "var(--red)", "✗"],
 };
 const T_SORT = ["awaiting_approval", "in_review", "needs_info", "failed", "analyzing", "implementing", "queued", "new", "done", "rejected"];
 const T_YOU = new Set(["awaiting_approval", "in_review", "needs_info", "failed"]);
@@ -257,7 +316,7 @@ function agentBlock(r) {
   let show = running.concat(recent), more = 0;
   const max = S.cfg.agent_rows;
   if (show.length > max) { more = show.length - max + 1; show = show.slice(0, max - 1); }
-  let h = `<div class="agents"><div><span class="dim">AGENTS</span>`
+  let h = `<div class="agents"><div><span class="dim">Agents</span>`
     + (nrun ? ` <b class="o">${nrun}</b> <span class="dim">running</span>` : "")
     + (nrun && ndone ? ` <span class="dim">·</span>` : "")
     + (ndone ? ` ${ndone} <span class="dim">done</span>` : "") + `</div><div class="grid">`;
@@ -299,7 +358,7 @@ function tileHTML(r) {
     task = tt ? `<span class="o">▶</span> <span title="${esc(tt)}">${esc(tt)}</span>` : `<span class="dim">working…</span>`;
   } else {
     const tt = one(r.done_task || r.prompt);
-    task = tt ? `<span style="color:var(--wait)">✓</span> <span class="dim" title="${esc(tt)}">${esc(tt)}</span>` : `<span class="dim">-</span>`;
+    task = tt ? `<span style="color:var(--wait)">✓</span> <span class="dim" title="${esc(tt)}">${esc(tt)}</span>` : `<span class="dim">No activity yet</span>`;
   }
   const rainbow = r.ultra && r.live;
   const pair = (l1, v1, l2, v2) => `<span><span class="dim">${l1}</span> ${esc(v1)}</span><span><span class="dim">${l2}</span> ${esc(v2)}</span>`;
@@ -313,18 +372,18 @@ function tileHTML(r) {
     + `<dt>git</dt><dd>${br ? `<span class="cy">${esc(br)}</span>` : `<span class="dim">none</span>`}</dd>`
     + `<dt>task</dt><dd>${task}</dd></dl>`
     + agentBlock(r)
-    + `<div class="ctx" style="--bc:${bc}"><div class="line"><span><span class="dim">CONTEXT</span> ${fmt(r.ctx)}<span class="dim">/${fmt(w)}</span></span>`
+    + `<div class="ctx" style="--bc:${bc}"><div class="line"><span><span class="dim">Context</span> ${fmt(r.ctx)}<span class="dim">/${fmt(w)}</span></span>`
     + `<b style="color:var(--bc)">${pct.toFixed(0)}%</b></div><div class="bar"><i style="width:${pct.toFixed(2)}%"></i></div></div>`
-    + `<div class="meta"><div><span class="dim">MODEL</span> ${esc(String(r.model).replace("claude-", ""))}</div>`
+    + `<div class="meta"><div><span class="dim">Model</span> ${esc(String(r.model).replace("claude-", ""))}</div>`
     + `<div class="pairs">${pair("turns", r.turns, "tools", r.tools)}${pair("out", fmt(r.out), "cache", fmt(r.cread))}`
     + `${pair("up", r.uptime, "idle", r.updated ? ago(r.updated) : "-")}</div></div>`
-    + `<button type="button" class="tile-tx" data-tx title="open in transcripts, as a 2×2 box" aria-label="Open in transcripts">${CHAT_ICON}</button>`
-    + `<button type="button" class="tile-tx tile-fx" data-fx title="open in focus: transcript, codebase, git status, session information" aria-label="Open in focus">${FX_ICON}</button></article>`;
+    + `<button type="button" class="tile-tx" data-tx title="Open in Transcripts" aria-label="Open in transcripts">${CHAT_ICON}</button>`
+    + `<button type="button" class="tile-tx tile-fx" data-fx title="Open in Focus: chat, files, editor and git" aria-label="Open in focus">${FX_ICON}</button></article>`;
 }
 
 function tableHTML(rows) {
-  let h = `<table class="tbl"><thead><tr><th>PID</th><th>STATUS</th><th>CONTEXT</th><th>MODEL</th><th class="num">TURNS</th><th class="num">TOOLS</th>`
-    + `<th class="num">OUT</th><th class="num">CACHE-R</th><th class="num">UP</th><th class="num">IDLE</th><th>SESSION</th></tr></thead><tbody>`;
+  let h = `<table class="tbl"><thead><tr><th>PID</th><th>Status</th><th>Context</th><th>Model</th><th class="num">Turns</th><th class="num">Tools</th>`
+    + `<th class="num">Out</th><th class="num">Cache</th><th class="num">Up</th><th class="num">Idle</th><th>Session</th></tr></thead><tbody>`;
   for (const r of rows) {
     const pct = r.ctx / win(r) * 100;
     const c = pct >= 85 ? "var(--red)" : pct >= 60 ? "var(--amber)" : "var(--green)";
@@ -350,7 +409,7 @@ function headHTML(rows) {
   const nother = live.length - nrun - nwait;
   const nag = live.reduce((s, r) => s + agentCounts(r).nrun, 0);
   const d = new Date();
-  return `<span class="brand">✻ Claude sessions</span>`
+  return `<span class="brand">Claude sessions</span><h1 class="view-title nv-only">${VIEWS[tab]}</h1>`
     + `<span class="count"><span class="dot o">●</span>${nrun} running</span>`
     + `<span class="count"><span class="dot" style="color:var(--wait)">●</span>${nwait} waiting</span>`
     + (nother ? `<span class="count"><span class="dot" style="color:var(--amber)">●</span>${nother} other</span>` : "")
@@ -365,7 +424,7 @@ function meter(pct, n, color) {
 }
 
 function usageHTML(d) {
-  if (!d) return `<span class="dim">usage limits: no data yet (appears after the next status line refresh)</span>`;
+  if (!d) return `<span class="dim">Usage limits appear after the next status line refresh.</span>`;
   const rl = d.rate_limits || {}, now = nowS(), parts = [];
   const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const at = (t, long) => { const x = new Date(t * 1000); return (long ? DAYS[x.getDay()] + " " : "") + `${p2(x.getHours())}:${p2(x.getMinutes())}`; };
@@ -373,14 +432,14 @@ function usageHTML(d) {
     const w = rl[key];
     if (!w) continue;
     const pct = Number(w.used_percentage) || 0, rs = w.resets_at;
-    if (rs && rs < now) { parts.push(`<b>${lab}</b> <span class="dim">window reset</span>`); continue; }
+    if (rs && rs < now) { parts.push(`<span class="u-part"><b>${lab}</b> <span class="dim">window reset</span></span>`); continue; }
     const n = 14, c = pctColor(pct);
-    const when = rs ? ` <span class="dim">resets</span> ${at(rs, long)} <span class="dim">(in ${rem(rs - now)})</span>` : "";
-    parts.push(`<b>${lab}</b> ${meter(pct, n, c)} <b style="color:${c}">${pct.toFixed(0)}%</b>${when}`);
+    const when = rs ? ` <span class="u-when"><span class="dim">resets</span> ${at(rs, long)} <span class="dim">(in ${rem(rs - now)})</span></span>` : "";
+    parts.push(`<span class="u-part"><b>${lab}</b> ${meter(pct, n, c)} <b style="color:${c}">${pct.toFixed(0)}%</b>${when}</span>`);
   }
-  if (!parts.length) return `<span class="dim">usage limits: n/a</span>`;
+  if (!parts.length) return `<span class="dim">Usage limits not available.</span>`;
   const sep = `<span class="sep">│</span>`;
-  return parts.join(sep) + sep + `<span class="dim">updated ${rem(now - (d.ts ?? now))} ago</span>`;
+  return parts.join(sep) + sep + `<span class="dim u-at">updated ${rem(now - (d.ts ?? now))} ago</span>`;
 }
 
 function msgsHTML(log) {
@@ -408,18 +467,16 @@ function chatHTML() {
 
 function txPlaceholder(r) {
   const t = r.tx;
-  if (t.pend) return "or type a reply: it denies with your message";
-  if (t.mode === "owned") return t.sending ? "working · enter queues a message" : "enter sends";
-  if (t.mode === "type") return `type to its ${t.app} tab · enter sends`;
-  if (t.mode === "resume") return "ended · enter resumes it in cs with your message";
-  return t.app ? `runs in ${t.app}: read-only here, focus it to type` : "no terminal: read-only";
+  if (t.pend) return "Or type a reply: it denies with your message";
+  if (t.mode === "owned") return t.sending ? "Working. Enter queues a message" : "Message";
+  if (t.mode === "type") return `Message its ${t.app} tab`;
+  if (t.mode === "resume") return "Ended. A message resumes it here";
+  return t.app ? `Read-only: runs in ${t.app}` : "Read-only: no terminal";
 }
 
 function renderTx() {
   const box = $("txs");
   if (tab !== "tx" && tab !== "focus") return;
-  const dirs = (S.projects || []).map(p => p.path), dsig = dirs.join("\n");
-  if ($("txDirs")._sig !== dsig) { $("txDirs").replaceChildren(...dirs.map(d => new Option(home(d), home(d)))); $("txDirs")._sig = dsig; }
   const rank = r => { const i = txOrder.indexOf(r.sid); return i < 0 ? 1e9 : i; };
   // boxes you never moved keep the server order, after the ones you did
   const rows = S.sessions.filter(r => r.tx).sort((a, b) => rank(a) - rank(b));
@@ -437,9 +494,9 @@ function renderTx() {
         + `<div class="tx-ask" hidden></div>`
         + `<div class="chat-field"><span class="p">❯</span><input class="tx-input" autocomplete="off" spellcheck="false">`
         + `<span class="tx-size" role="group" aria-label="Box size"><span class="tx-size-pop">${TX_SIZES.map(z => `<button type="button" data-size="${z}" title="${txSizeName(z)}" aria-label="size ${txSizeName(z)}">${txIcon(z)}</button>`).join("")}</span></span>`
-        + `<button type="button" class="tile-tx tx-fx" data-act="fx" title="open in focus: transcript, codebase, git status, session information" aria-label="Open in focus">${FX_ICON}</button>`
+        + `<button type="button" class="tile-tx tx-fx" data-act="fx" title="Open in Focus: chat, files, editor and git" aria-label="Open in focus">${FX_ICON}</button>`
         + `<select class="tx-mode" aria-label="Permission mode" title="permission mode">${$("txNew").elements.mode.innerHTML}</select>`
-        + `<button type="button" class="tk-btn" data-act="stop"></button><button type="button" class="tk-btn" data-act="focus">focus</button></div>`;
+        + `<button type="button" class="tk-btn" data-act="stop"></button><button type="button" class="tk-btn" data-act="focus" title="Bring its app to the front (f)">Show App</button></div>`;
     }
     const [label, cls] = stateOf(r), t = r.tx;
     const size = txSizes[r.sid] || "1x1";
@@ -450,7 +507,7 @@ function renderTx() {
     const title = (tk ? `task #${tk.id} · ` : "") + (r.name || r.sid.slice(0, 8));
     const side = `${label.toLowerCase()} · ${r.proj}${t.app ? ` · ${t.app}` : ""}`;
     const hd = el.querySelector(".chat-head");
-    if (hd._sig !== title + side) { hd.children[0].textContent = `✻ ${title}`; hd.children[1].textContent = side; hd.title = `${r.sid} · drag to reorder (or shift+←/→)`; hd._sig = title + side; }
+    if (hd._sig !== title + side) { hd.children[0].textContent = title; hd.children[1].textContent = side; hd.title = "Drag to reorder (or shift+←/→)"; hd._sig = title + side; }
     const lg = el.querySelector(".chat-log");
     const sig = JSON.stringify([t.log, t.sending, t.err, r.status]);
     if (lg._sig !== sig) {
@@ -463,9 +520,9 @@ function renderTx() {
     if (ask._sig !== asig) {
       ask.hidden = !t.pend;
       ask.innerHTML = !t.pend ? "" : (t.pend.plan != null
-        ? `<div class="tx-ask-q"><b class="tk-you">◆ the plan waits for you</b></div><div class="tx-plan md">${md(t.pend.plan)}</div>`
-        : `<div class="tx-ask-q"><b class="tk-you">◆ allow ${esc(t.pend.tool)}?</b> <span class="dim">${esc(one(t.pend.what))}</span></div>`)
-        + `<div class="tk-acts"><button type="button" class="tk-btn primary" data-act="allow">${t.pend.plan != null ? "approve" : "allow"}</button><button type="button" class="tk-btn" data-act="deny">deny</button></div>`;
+        ? `<div class="tx-ask-q"><b class="tk-you">The plan is waiting for you</b></div><div class="tx-plan md">${md(t.pend.plan)}</div>`
+        : `<div class="tx-ask-q"><b class="tk-you">Allow ${esc(t.pend.tool)}?</b> <span class="dim">${esc(one(t.pend.what))}</span></div>`)
+        + `<div class="tk-acts"><button type="button" class="tk-btn primary" data-act="allow">${t.pend.plan != null ? "Approve" : "Allow"}</button><button type="button" class="tk-btn" data-act="deny">Deny</button></div>`;
       ask._sig = asig;
     }
     const inp = el.querySelector("input");
@@ -477,8 +534,8 @@ function renderTx() {
     if (t.perm && document.activeElement !== mode) mode.value = t.perm;
     const stop = el.querySelector("[data-act=stop]");
     stop.hidden = t.mode !== "owned";
-    stop.textContent = t.sending ? "stop" : "close";
-    stop.title = t.sending ? "interrupt the current turn" : "end this session (you can resume it later)";
+    stop.textContent = t.sending ? "Stop" : "Close";
+    stop.title = t.sending ? "Interrupt the current turn" : "End this session (you can resume it later)";
     el.querySelector("[data-act=focus]").hidden = !r.live || t.mode === "owned";
     const want = prev ? prev.nextElementSibling : box.firstElementChild;
     if (el !== want) box.insertBefore(el, want);
@@ -816,13 +873,32 @@ function renderProjects() {
   const sig = JSON.stringify(show.map(p => [p.path, p.name]));
   if (sig !== projSig) {
     $("projList").innerHTML = show.length
-      ? show.map(p => `<button type="button" class="proj" data-path="${esc(p.path)}" title="${esc(home(p.path))} · open in VS Code">${esc(p.name)}</button>`).join("")
+      ? show.map(p => `<button type="button" class="proj" data-path="${esc(p.path)}" title="Open ${esc(home(p.path))} in VS Code">${ph("folder", "ic")}<span>${esc(p.name)}</span></button>`).join("")
       : `<span class="dim">no git repos in ${esc(cfg.dir)}</span>`;
     projSig = sig;
   }
-  const dir = $("projDir");
-  dir.textContent = cfg.env ? "$CS_REPO_ROOTS" : cfg.dir;
-  dir.title = cfg.env ? "set by CS_REPO_ROOTS, which overrides the setting" : "projects folder · click to change";
+  renderSettings();
+}
+
+// the settings sheet can be open on any tab, so it syncs on every render
+function renderSettings() {
+  const cfg = S.cfg.projects || {};
+  if (document.activeElement !== dirIn) dirIn.value = cfg.dir || "";
+  dirIn.disabled = !!cfg.env;
+  $("projDirHelp").textContent = dirErr || (cfg.env ? "Set by CS_REPO_ROOTS, which overrides this setting." : "Where your git repos live. Separate several with a colon.");
+  $("projDirHelp").classList.toggle("err", !!dirErr);
+  const ib = S.tasks?.inbox;
+  if (ib) {
+    if (document.activeElement !== $("tkAuto")) $("tkAuto").checked = ib.auto;
+    const ev = $("tkEvery");
+    if (![...ev.options].some(o => o.value === String(ib.every))) ev.add(new Option(String(ib.every), String(ib.every)));
+    if (document.activeElement !== ev) ev.value = String(ib.every);
+  }
+  const tm = $("tkTerm"), term = S.cfg.terminal || { app: "Terminal", list: ["Terminal"] };
+  if (tm.options.length !== term.list.length) tm.replaceChildren(...term.list.map(n => new Option(n === "cs" ? "This dashboard" : n, n)));
+  if (document.activeElement !== tm) tm.value = term.app;
+  const dirs = (S.projects || []).map(p => p.path), dsig = dirs.join("\n");
+  if ($("txDirs")._sig !== dsig) { $("txDirs").replaceChildren(...dirs.map(d => new Option(home(d), home(d)))); $("txDirs")._sig = dsig; }
 }
 
 function renderMenu() {
@@ -832,7 +908,7 @@ function renderMenu() {
   projSel = Math.max(0, Math.min(projSel, hits.length - 1));
   m.innerHTML = hits.length
     ? hits.map((p, i) => `<div class="proj-opt${i === projSel ? " on" : ""}" role="option" aria-selected="${i === projSel}" data-path="${esc(p.path)}"><span class="n">${esc(p.name)}</span><span class="r">${esc(p.rel)}</span></div>`).join("")
-    : `<div class="proj-none">no match</div>`;
+    : `<div class="proj-none">No match</div>`;
   m.hidden = false;
   m._hits = hits;
 }
@@ -860,10 +936,10 @@ function when(s) {
 
 function scanHTML(ib) {
   if (!ib) return "";
-  if (ib.running) return `<span class="o"><span data-spin="0">${SPIN[FRAME % 10]}</span> scanning the inbox… ${dur(nowS() - (ib.t0 || nowS()))}</span>`;
+  if (ib.running) return `<span class="o"><span data-spin="0">${SPIN[FRAME % 10]}</span> Scanning the inbox… ${dur(nowS() - (ib.t0 || nowS()))}</span>`;
   const l = ib.last;
-  let h = !l ? `<span class="dim">no scan yet</span>`
-    : l.ok ? `last scan ${ago(l.t0 * 1000)} ago` + (l.created ? ` · <b class="o">${l.created} new</b>` : "") + (l.updated ? ` · ${l.updated} updated` : "")
+  let h = !l ? `<span class="dim">No scan yet</span>`
+    : l.ok ? `Last scan ${ago(l.t0 * 1000)} ago` + (l.created ? ` · <b class="o">${l.created} new</b>` : "") + (l.updated ? ` · ${l.updated} updated` : "")
     : `<span class="err" title="${esc(l.error || "")}">scan failed ${ago(l.t0 * 1000)} ago: ${esc(one(l.error || "unknown error").slice(0, 80))}</span>`;
   if (ib.auto && ib.next) h += ` <span class="dim">· next ${ib.next <= nowS() ? "soon" : "in " + rem(ib.next - nowS())}</span>`;
   return h;
@@ -875,7 +951,7 @@ function mailHTML() {
   return mailData.threads.map(th => {
     const task = th.outcome === "task", url = gmail(th.url);
     const act = task ? (th.task_id ? `<a href="#" data-goto="${th.task_id}">task #${th.task_id}</a>` : `<span class="dim">task deleted</span>`)
-      : `<button type="button" class="tm-make" data-make="${esc(th.id)}">make task</button>`;
+      : `<button type="button" class="tm-make" data-make="${esc(th.id)}">Make Task</button>`;
     const subj = esc(th.subject || "(no subject)");
     return `<div class="tm-row${task ? " task" : ""}"><span class="tm-o">${task ? "✓" : "–"}</span>`
       + `<span class="tm-date" title="${esc(when(th.date))}">${th.date && !isNaN(new Date(th.date)) ? ago(new Date(th.date).getTime()) : ""}</span>`
@@ -897,15 +973,6 @@ function renderInbox() {
   const sh = scanHTML(ib);
   if (sh !== scanSig) { $("tkScanInfo").innerHTML = sh; scanSig = sh; }
   $("tkScan").disabled = !ib || ib.running;
-  if (ib) {
-    if (document.activeElement !== $("tkAuto")) $("tkAuto").checked = ib.auto;
-    const ev = $("tkEvery");
-    if (![...ev.options].some(o => o.value === String(ib.every))) ev.add(new Option(String(ib.every), String(ib.every)));
-    if (document.activeElement !== ev) ev.value = String(ib.every);
-  }
-  const tm = $("tkTerm"), term = S.cfg.terminal || { app: "Terminal", list: ["Terminal"] };
-  if (tm.options.length !== term.list.length) tm.replaceChildren(...term.list.map(n => new Option(n === "cs" ? "dashboard (cs)" : n, n)));
-  if (document.activeElement !== tm) tm.value = term.app;
   $("tkMail").classList.toggle("on", mailOpen);
   $("tkMailBox").hidden = !mailOpen;
   if (!mailOpen) return;
@@ -940,8 +1007,8 @@ function tasksHTML() {
   const order = (a, b) => T_SORT.indexOf(a.status) - T_SORT.indexOf(b.status) || (PRIO[a.priority] ?? 3) - (PRIO[b.priority] ?? 3) || b.updated - a.updated;
   const roots = all.filter(t => !(t.parent_id && ids.has(t.parent_id)) && vis(t)).sort(order);
   if (!roots.length) return all.length
-    ? `<p class="empty">No open tasks. Press <b>a</b> to show done and rejected ones too.</p>`
-    : `<p class="empty">No tasks yet. Press <b>n</b> to add one.</p>`;
+    ? `<p class="empty">No open tasks. Choose <b>All</b> to see finished ones.</p>`
+    : `<p class="empty">No tasks yet. Choose <b>New Task</b> to add one.</p>`;
   const row = (t, d) => {
     let h = `<div class="tk-row${t.id === tkSel ? " sel" : ""}${isOpen(t) ? "" : " closed"}" data-tid="${t.id}" style="--tc:${tkColor(t)};--d:${d}">`
       + `<span class="tk-ic">${tkIcon(t)}</span><span class="tk-id">#${t.id}</span>`
@@ -1018,21 +1085,21 @@ function renderDetail() {
   if (!t) { $("tkInfo").innerHTML = `<p class="dim">loading #${tkSel}…</p>`; $("tkLog").innerHTML = ""; return; }
   const kv = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : "";
   $("tkInfo").innerHTML = `<div class="tk-d-hd" style="--tc:${tkColor(t)}"><span class="tk-id">#${t.id}</span><span class="tk-badge">${tkIcon(t)} ${esc(tkLabel(t))}</span>`
-    + `<button type="button" class="tk-x" data-act="close" title="close (esc)" aria-label="Close">✕</button></div>`
+    + `<button type="button" class="tk-x" data-act="close" title="Close (esc)" aria-label="Close">✕</button></div>`
     + `<h2 class="tk-d-title">${esc(t.title)}</h2>`
     + `<dl class="tk-kv">${kv("project", esc(t.rel || `${t.client} · repo not set`))}`
     + kv("parent", t.parent_id ? `<a href="#" data-goto="${t.parent_id}">#${t.parent_id}</a>` : "")
     + kv("source", esc(t.source)) + kv("branch", t.branch ? `<span class="cy">${esc(t.branch)}</span>` : "")
     + kv("created", `${ago(t.created * 1000)} ago`) + `</dl>`
     + sessHTML(t, sess)
-    + (t.report ? `<div class="tk-sec">report</div><div class="tk-text">${esc(t.report)}</div>` : "")
-    + (t.changes ? `<div class="tk-sec">changes</div><dl class="tk-kv">${kv("worktree", t.changes.worktree ? esc(home(t.changes.worktree)) : `<span class="dim">none</span>`)}</dl>`
+    + (t.report ? `<div class="tk-sec">Report</div><div class="tk-text">${esc(t.report)}</div>` : "")
+    + (t.changes ? `<div class="tk-sec">Changes</div><dl class="tk-kv">${kv("worktree", t.changes.worktree ? esc(home(t.changes.worktree)) : `<span class="dim">none</span>`)}</dl>`
       + (t.changes.commits ? `<div class="tk-text tk-code">${esc(t.changes.commits)}${t.changes.stat ? "\n\n" + esc(t.changes.stat) : ""}</div>` : `<p class="dim">no commits on the branch yet</p>`) : "")
-    + (t.result ? `<div class="tk-sec">${t.kind === "check" ? "findings" : "plan"}</div><div class="tk-text">${esc(t.result)}</div>` : "")
-    + `<div class="tk-sec">description</div>` + (t.summary ? `<div class="tk-text">${esc(t.summary)}</div>` : `<p class="dim">no description</p>`)
-    + (t.thread ? `<div class="tk-sec">email</div><dl class="tk-kv">${kv("from", esc(t.thread.sender))}${kv("subject", esc(t.thread.subject))}`
+    + (t.result ? `<div class="tk-sec">${t.kind === "check" ? "Findings" : "Plan"}</div><div class="tk-text">${esc(t.result)}</div>` : "")
+    + `<div class="tk-sec">Description</div>` + (t.summary ? `<div class="tk-text">${esc(t.summary)}</div>` : `<p class="dim">no description</p>`)
+    + (t.thread ? `<div class="tk-sec">Email</div><dl class="tk-kv">${kv("from", esc(t.thread.sender))}${kv("subject", esc(t.thread.subject))}`
       + `${kv("date", esc(when(t.thread.date)))}</dl>`
-      + (gmail(t.thread.url) ? `<a class="tk-gmail" href="${esc(gmail(t.thread.url))}" target="_blank" rel="noopener">open in Gmail ↗</a>` : "") : "");
+      + (gmail(t.thread.url) ? `<a class="tk-gmail" href="${esc(gmail(t.thread.url))}" target="_blank" rel="noopener">Open in Gmail ↗</a>` : "") : "");
   $("tkLog").innerHTML = t.events.slice().reverse().map(e => `<div class="tk-ev"><span class="tk-ev-t">${ago(e.t * 1000)}</span>`
     + `<span class="tk-ev-k">${esc(e.kind)}</span><span class="x">${esc(e.kind === "status" ? e.text.replace(/\w+/g, s => TS[s]?.[0] ?? s) : e.text)}</span></div>`).join("");
   for (const [id, v] of [["tkStatus", t.status], ["tkPrio", t.priority || ""], ["tkKind", t.kind]])
@@ -1041,25 +1108,29 @@ function renderDetail() {
   $("tkDismiss").hidden = !(t.source === "email" && isOpen(t));
 }
 
+let tkPerm = "bypassPermissions";
+const tkModeHTML = () => `<select class="tx-mode tk-mode" aria-label="Session permission mode" title="permission mode">`
+  + $("txNew").elements.mode.innerHTML.replace(`value="${tkPerm}"`, `value="${tkPerm}" selected`) + `</select>`;
+
 function sessHTML(t, sess) {
   let line, acts;
   if (!t.session_id) {
-    line = t.repo ? `No Claude session yet. Analyze opens one in ${esc(S.cfg.terminal?.app || "Terminal")}, in plan mode, in ${esc(home(t.repo))}.`
+    line = t.repo ? `No Claude session yet. Analyze opens one in ${esc(S.cfg.terminal?.app || "Terminal")}, in ${esc(home(t.repo))}.`
       : `Set the task's repo (edit, then pick client/repo) to analyze it.`;
-    acts = `<button type="button" class="tk-btn primary" data-act="analyze"${t.repo ? "" : " disabled"}>analyze</button>`;
+    acts = tkModeHTML() + `<button type="button" class="tk-btn primary" data-act="analyze"${t.repo ? "" : " disabled"}>Analyze</button>`;
   } else if (sess) {
     const busy = sess.status === "busy";
     line = busy ? `<span class="o"><span data-spin="0">${SPIN[FRAME % 10]}</span> session ${esc(t.session_id.slice(0, 8))} is working</span>${sess.act ? ` <span class="dim">· ${esc(one(sess.act))}</span>` : ""}`
-      : t.status === "awaiting_approval" ? `<b class="tk-you">◆ the plan waits for you</b> <span class="dim">in session ${esc(t.session_id.slice(0, 8))}: approve it or comment there</span>`
+      : t.status === "awaiting_approval" ? `<b class="tk-you">The plan is waiting for you</b> <span class="dim">in session ${esc(t.session_id.slice(0, 8))}: approve it or comment there</span>`
       : `<span class="tk-you">○ session ${esc(t.session_id.slice(0, 8))} is waiting for you</span>`;
-    acts = `<button type="button" class="tk-btn primary" data-act="focus">focus session</button>`;
+    acts = `<button type="button" class="tk-btn primary" data-act="focus">Show Session</button>`;
   } else if (t.status === "analyzing" && nowS() - t.updated < 90) {
     line = `<span class="o"><span data-spin="0">${SPIN[FRAME % 10]}</span> starting session ${esc(t.session_id.slice(0, 8))} in ${esc(S.cfg.terminal?.app || "Terminal")}…</span>`;
     acts = "";
   } else {
     line = `<span class="dim">session ${esc(t.session_id.slice(0, 8))} has ended</span>`;
-    acts = `<button type="button" class="tk-btn primary" data-act="resume">resume session</button>`
-      + `<button type="button" class="tk-btn" data-act="again">analyze again</button>`;
+    acts = tkModeHTML() + `<button type="button" class="tk-btn primary" data-act="resume">Resume Session</button>`
+      + `<button type="button" class="tk-btn" data-act="again">Analyze Again</button>`;
   }
   return `<div class="tk-sess"><div class="tk-sess-line">${line}</div>${acts ? `<div class="tk-acts">${acts}</div>` : ""}</div>`;
 }
@@ -1068,7 +1139,7 @@ async function taskSession(resume) {
   const t = tkCur;
   if (!t) return;
   try {
-    tkCur = await api("/api/task/session", { id: t.id, resume });
+    tkCur = await api("/api/task/session", { id: t.id, resume, mode: tkPerm });
     const app = S.cfg.terminal?.app || "Terminal";
     flash = [resume ? `resumed #${t.id}'s session in ${app}` : `#${t.id}: Claude is analyzing it in ${app}`, Date.now()];
   } catch (e) {
@@ -1105,19 +1176,18 @@ const F = n => $("tkForm").elements[n];
 function openForm(mode, t) {
   tkMode = { mode, id: t?.id };
   const th = mode === "thread" ? t : null, task = th ? null : t;
-  $("tkFormHead").textContent = mode === "edit" ? `edit #${t.id}` : mode === "sub" ? `new subtask of #${t.id}` : th ? "new task from email" : "new task";
+  $("tkFormHead").textContent = mode === "edit" ? `Edit #${t.id}` : mode === "sub" ? `New Subtask of #${t.id}` : th ? "New Task from Email" : "New Task";
   F("title").value = mode === "edit" ? t.title : th ? th.subject.replace(/^(\s*(re|r|i|fw|fwd|rif)\s*:\s*)+/i, "") : "";
   F("project").value = th ? th.guess || "" : task ? task.rel || task.client : "";
   F("kind").value = task ? task.kind : "fix";
   F("priority").value = mode === "edit" ? t.priority || "" : "";
   F("summary").value = mode === "edit" ? t.summary : th ? `${th.sender}: ${th.snippet}` : "";
   $("tkErr").textContent = "";
-  $("tkForm").hidden = false;
   if (tab !== "tasks") setTab("tasks");
+  $("tkDlg").showModal();
   F("title").focus();
-  $("tkForm").scrollIntoView({ block: "nearest" });
 }
-function closeForm() { $("tkForm").hidden = true; tkMode = null; renderHint(); }
+function closeForm() { $("tkDlg").close(); tkMode = null; renderHint(); }
 
 async function tkUpdate(fields) {
   if (!tkCur) return false;
@@ -1132,12 +1202,17 @@ async function tkUpdate(fields) {
 function render() {
   const onT = tab === "tasks", onF = tab === "focus", onX = tab === "tx" || onF;
   $("tabs").querySelectorAll("[data-tab]").forEach(b => { b.classList.toggle("on", b.dataset.tab === tab); b.setAttribute("aria-pressed", String(b.dataset.tab === tab)); });
+  $("viewSeg").hidden = tab !== "sessions";
+  $("viewSeg").querySelectorAll("[data-view]").forEach(b => { b.classList.toggle("on", b.dataset.view === view); b.setAttribute("aria-pressed", String(b.dataset.view === view)); });
+  $("endedWrap").hidden = onT;
+  $("ended").checked = showAll;
+  $("topNew").textContent = onT ? "New Task" : "New Session";
   if (!S) { renderHint(); return; }
   const rows = S.sessions;
   $("head").innerHTML = headHTML(rows);
   const empty = $("empty");
   empty.hidden = onT || rows.length > 0;
-  if (!rows.length) empty.innerHTML = showAll ? `No sessions in the last 24h.` : `No live Claude sessions. Press <b>a</b> to include sessions ended in the last 24h.`;
+  if (!rows.length) empty.innerHTML = showAll ? `No sessions in the last 24 hours. Choose <b>New Session</b> to start one.` : `No running sessions. Choose <b>New Session</b> to start one, or <b>Show ended</b> to see the last 24 hours.`;
   $("tiles").hidden = onT || onX || view !== "tiles";
   $("table").hidden = onT || onX || view !== "table";
   $("tasks").hidden = !onT;
@@ -1158,8 +1233,9 @@ function render() {
 
   const on = chatOn();
   $("chat").classList.toggle("on", on);
-  $("chatSide").textContent = `${S.cfg.chat_model} · ${on ? "enter send · esc close" : "/ to type"}`;
-  ask.placeholder = on ? TIP : `press / to ask Claude · ${TIP}`;
+  $("chat").classList.toggle("busy", S.chat.working);
+  $("chatSide").textContent = S.cfg.chat_model;
+  ask.placeholder = `Ask Claude to ${TIP}`;
   const log = $("chatLog");
   const sig = JSON.stringify([S.chat.log, S.chat.working, S.chat.working && Math.floor(nowS() - S.chat.t0)]);
   if (sig !== chatSig) {
@@ -1175,21 +1251,24 @@ function render() {
   renderHint();
 }
 
-function renderHint() {
-  const keys = chatOn()
+function hintKeys() {
+  return chatOn()
     ? "enter send · esc close chat · ctrl-u clear line · /clear new chat"
     : document.activeElement === $("projQ") ? "type to filter · ↑↓ select · enter open in VS Code · esc close"
     : document.activeElement?.closest?.("#tkForm") ? "enter saves (⌘/ctrl-enter in the description) · esc cancels"
     : document.activeElement === $("tkNote") ? "enter saves the note · esc leaves"
     : document.activeElement?.classList?.contains("tx-input") ? "enter send · esc leave · ctrl-u clear line"
     : document.activeElement === $("fxEd") ? "⌘/ctrl-S save · tab indent · shift-tab outdent · esc leave"
-    : tab === "focus" ? `1 sessions · 2 tasks · 3 transcripts · ←→ switch session · enter type · f focus terminal · a ${showAll ? "hide ended" : "show ended"} · / chat · r refresh`
+    : tab === "focus" ? `1 sessions · 2 tasks · 3 transcripts · ←→ switch session · n new session · enter type · f focus terminal · a ${showAll ? "hide ended" : "show ended"} · / chat · r refresh`
     : tab === "tx" ? `1 sessions · 2 tasks · 4 focus · ←↑↓→ select · enter type · n new session · s size · shift+←→ move · f focus · a ${showAll ? "hide ended" : "show ended"} · / chat · r refresh`
-    : tab === "tasks" ? `1 sessions · ↑↓ select · n new task · e edit · esc close · a ${tkShow === "all" ? "open only" : "show all"} · s scan inbox · m inbox log · / chat · r refresh`
-    : `←↑↓→ select · enter/click focus · 2 tasks · 3 transcripts · 4 focus · / chat · p projects · a ${showAll ? "hide ended" : "show ended"} · t ${view === "tiles" ? "table" : "tiles"} · r refresh${installPrompt ? " · i install app" : ""}`;
-  let h = esc(keys);
-  if (flash[0] && Date.now() - flash[1] < 5000) h += `<span class="flash">▸ ${esc(flash[0])}</span>`;
-  if (offline) h += `<span class="off">✗ server not reachable, retrying…</span>`;
+    : tab === "tasks" ? `1 sessions · 3 transcripts · 4 focus · ↑↓ select · n new task · e edit · esc close · a ${tkShow === "all" ? "open only" : "show all"} · s scan inbox · m inbox log · / chat · r refresh`
+    : `←↑↓→ select · n new session · enter/double-click bring its app to the front · 2 tasks · 3 transcripts · 4 focus · / chat · p projects · a ${showAll ? "hide ended" : "show ended"} · t ${view === "tiles" ? "table" : "tiles"} · r refresh · , settings · ? shortcuts${installPrompt ? " · i install app" : ""}`;
+}
+
+function renderHint() {
+  let h = `<span class="keys">${esc(hintKeys())}</span>`;
+  if (flash[0] && Date.now() - flash[1] < 5000) h += `<span class="flash">${esc(flash[0])}</span>`;
+  if (offline) h += `<span class="off">Server not reachable, retrying…</span>`;
   $("hint").innerHTML = h;
 }
 
@@ -1310,13 +1389,15 @@ function move(key) {
 }
 
 document.addEventListener("keydown", e => {
-  if (e.target.closest?.("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.closest?.("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey || document.querySelector("dialog[open]")) return;
   const k = e.key;
+  if (k === "?") { openKeys(); return; }
+  if (k === ",") { $("setDlg").showModal(); return; }
   if (k === "1" || k === "2" || k === "3" || k === "4") { setTab({ 1: "sessions", 2: "tasks", 3: "tx", 4: "focus" }[k]); return; }
   if (tab === "tx" || tab === "focus") {
     if (k === "Enter") { e.preventDefault(); document.querySelector(`.txbox[data-sid="${CSS.escape(sel || "")}"] input`)?.focus(); return; }
     if (k === "f" || k === "F") { e.preventDefault(); focusSel(); return; }
-    if (tab === "tx" && (k === "n" || k === "N")) { e.preventDefault(); $("txNew").elements.cwd.focus(); return; }
+    if (k === "n" || k === "N") { e.preventDefault(); openNew(); return; }
     if (tab === "tx" && e.shiftKey && (k === "ArrowLeft" || k === "ArrowRight") && sel) { e.preventDefault(); const ids = [...$("txs").children].map(el => el.dataset.sid); txMove(sel, ids.indexOf(sel) + (k === "ArrowRight" ? 1 : -1)); return; }
     if (tab === "tx" && (k === "s" || k === "S") && sel) { e.preventDefault(); txResize(sel, TX_SIZES[(TX_SIZES.indexOf(txSizes[sel] || "1x1") + 1) % TX_SIZES.length]); return; }
     if (k === " " || k === "t" || k === "T") return;
@@ -1325,20 +1406,21 @@ document.addEventListener("keydown", e => {
     if (k === "ArrowDown" || k === "ArrowUp") { e.preventDefault(); moveTask(k === "ArrowDown" ? 1 : -1); return; }
     if (k === "n" || k === "N") { e.preventDefault(); openForm("new"); return; }
     if ((k === "e" || k === "E") && tkCur && tkCur.id === tkSel) { e.preventDefault(); openForm("edit", tkCur); return; }
-    if (k === "Escape") { if (!$("tkForm").hidden) closeForm(); else selectTask(null); return; }
+    if (k === "Escape") { selectTask(null); return; }
     if (k === "a" || k === "A") { tkShow = tkShow === "all" ? "open" : "all"; store.set("cs.tkshow", tkShow); render(); return; }
     if (k === "s" || k === "S") { e.preventDefault(); scanNow(); return; }
     if (k === "m" || k === "M") { e.preventDefault(); toggleMail(); return; }
     if (k === "Enter" || k === " " || k.startsWith("Arrow") || k === "t" || k === "T") return;
   }
-  if (k.startsWith("Arrow")) { e.preventDefault(); move(k); }
+  if (k === "n" || k === "N") { e.preventDefault(); openNew(); }
+  else if (k.startsWith("Arrow")) { e.preventDefault(); move(k); }
   else if (k === "Enter" || k === " ") { e.preventDefault(); focusSel(); }
   else if (k === "/") { e.preventDefault(); ask.focus(); }
   else if (k === "p" || k === "P") { e.preventDefault(); $("projQ").focus(); }
-  else if (k === "a" || k === "A") { showAll = !showAll; store.set("cs.all", showAll ? "1" : "0"); render(); poll(true); }
+  else if (k === "a" || k === "A") setEnded(!showAll);
   else if (k === "r" || k === "R") poll(true);
   else if (k === "i" || k === "I") install();
-  else if (k === "t" || k === "T") { view = view === "tiles" ? "table" : "tiles"; store.set("cs.view", view); render(); }
+  else if (k === "t" || k === "T") setView(view === "tiles" ? "table" : "tiles");
 });
 
 ask.addEventListener("keydown", e => {
@@ -1349,6 +1431,39 @@ ask.addEventListener("keydown", e => {
 ask.addEventListener("focus", render);
 ask.addEventListener("blur", render);
 $("chat").addEventListener("mousedown", e => { if (e.target !== ask) { e.preventDefault(); ask.focus(); } });
+
+function setEnded(on) { showAll = on; store.set("cs.all", on ? "1" : "0"); render(); poll(true); }
+function setView(v) { view = v; store.set("cs.view", v); render(); }
+function openNew() {
+  if (tab === "tasks") return openForm("new");
+  const f = $("txNew").elements, r = S?.sessions.find(x => x.sid === sel);
+  if (r) f.cwd.value = home(r.cwd);
+  $("txErr").textContent = "";
+  $("txDlg").showModal();
+  f.cwd.select();
+}
+// the hint line is the one list of keys: each "key label" pair becomes a row
+function openKeys() {
+  $("keysList").innerHTML = hintKeys().split(" · ").map(p => {
+    const i = p.indexOf(" ");
+    return `<dt>${esc(p.slice(0, i))}</dt><dd>${esc(p.slice(i + 1))}</dd>`;
+  }).join("");
+  $("keysDlg").showModal();
+}
+const setRail = () => $("app").classList.toggle("rail", store.get("cs.rail") === "1" || innerWidth < 820);
+setRail();
+addEventListener("resize", setRail);
+$("sideBtn").addEventListener("click", () => { store.set("cs.rail", $("app").classList.contains("rail") ? "0" : "1"); setRail(); });
+$("topNew").addEventListener("click", openNew);
+$("setBtn").addEventListener("click", () => $("setDlg").showModal());
+$("helpBtn").addEventListener("click", openKeys);
+$("ended").addEventListener("change", e => setEnded(e.target.checked));
+$("viewSeg").addEventListener("click", e => { const b = e.target.closest("[data-view]"); if (b) setView(b.dataset.view); });
+for (const d of document.querySelectorAll("dialog.sheet")) d.addEventListener("click", e => {
+  // the backdrop reports as the dialog itself, so tell it from the dialog's padding by position
+  const r = d.getBoundingClientRect(), out = e.target === d && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+  if (out || e.target.closest("[data-close]")) d.close();
+});
 
 function openTx(sid) {
   txSizes[sid] = "2x2";
@@ -1366,7 +1481,7 @@ function pick(e) {
   if (!el) return;
   sel = el.dataset.sid;
   render();
-  focusSel();
+  if (e.detail > 1) focusSel();
 }
 $("projList").addEventListener("click", e => {
   const el = e.target.closest("[data-path]");
@@ -1388,33 +1503,22 @@ $("projMenu").addEventListener("mousedown", e => {
   const el = e.target.closest("[data-path]");
   if (el) { projQ.blur(); openProject(el.dataset.path); }
 });
-const dirIn = $("projDirIn");
-$("projDir").addEventListener("click", () => {
-  const cfg = S?.cfg.projects;
-  if (!cfg) return;
-  if (cfg.env) { flash = ["the projects folder is set by CS_REPO_ROOTS; unset it to change it here", Date.now()]; renderHint(); return; }
-  $("projDir").hidden = true;
-  dirIn.hidden = false;
-  dirIn.value = cfg.dir;
-  dirIn.focus();
-  dirIn.select();
+dirIn.addEventListener("input", () => { dirErr = ""; });
+dirIn.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.isComposing) dirIn.blur();
+  else if (e.key === "Escape") dirIn.value = S?.cfg.projects?.dir || "";
 });
-function closeDir() { dirIn.hidden = true; $("projDir").hidden = false; }
-dirIn.addEventListener("blur", closeDir);
-dirIn.addEventListener("keydown", async e => {
-  if (e.key === "Escape") { e.preventDefault(); dirIn.blur(); return; }
-  if (e.key !== "Enter" || e.isComposing) return;
-  e.preventDefault();
+dirIn.addEventListener("change", async () => {
   try {
     const r = await api("/api/settings", { projects: dirIn.value });
     S.cfg.projects.dir = r.projects;
-    flash = [`projects folder: ${r.projects}`, Date.now()];
-    dirIn.blur();
+    dirErr = "";
     poll(true);
   } catch (err) {
-    flash = [err.status === 400 ? `not a folder: ${dirIn.value}` : `could not save: ${err.message}`, Date.now()];
+    dirErr = err.status === 400 ? `Not a folder: ${dirIn.value}` : `Could not save: ${err.message}`;
   }
   renderHint();
+  if (S) renderSettings();
 });
 
 $("txs").addEventListener("click", e => {
@@ -1456,7 +1560,9 @@ $("txNew").addEventListener("submit", async e => {
     sel = r.sid;
     f.text.value = "";
     flash = [r.msg, Date.now()];
-  } catch (err) { flash = [`could not start: ${err.message}`, Date.now()]; }
+    $("txDlg").close();
+  } catch (err) { $("txErr").textContent = `Could not start: ${err.message}`; return; }
+  if (tab !== "tx" && tab !== "focus") tab = "tx", store.set("cs.tab", tab);
   await poll(true);
   document.querySelector(`.txbox[data-sid="${CSS.escape(sel || "")}"] input`)?.focus();
 });
@@ -1527,7 +1633,6 @@ $("tabs").addEventListener("click", e => {
   if (b) setTab(b.dataset.tab);
 });
 $("tkStatus").innerHTML = Object.entries(TS).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join("");
-$("tkNew").addEventListener("click", () => openForm("new"));
 $("tkCancel").addEventListener("click", closeForm);
 $("tkShow").addEventListener("click", e => {
   const b = e.target.closest("[data-show]");
@@ -1540,6 +1645,7 @@ $("tkList").addEventListener("click", e => {
   const el = e.target.closest("[data-tid]");
   if (el) selectTask(Number(el.dataset.tid) === tkSel ? null : Number(el.dataset.tid));
 });
+$("tkDetail").addEventListener("change", e => { if (e.target.matches(".tk-mode")) tkPerm = e.target.value; });
 $("tkDetail").addEventListener("click", e => {
   if (e.target.closest("[data-act=close]")) { selectTask(null); return; }
   const act = e.target.closest("[data-act]")?.dataset.act;
@@ -1563,7 +1669,7 @@ tkForm.addEventListener("submit", async e => {
   if (mode === "sub") body.parent_id = id;
   if (mode === "thread") body.thread_id = id;
   if (!body.project) {
-    if (mode !== "sub") { $("tkErr").textContent = "pick a project"; F("project").focus(); return; }
+    if (mode !== "sub") { $("tkErr").textContent = "Pick a project"; F("project").focus(); return; }
     delete body.project;
   }
   try {
@@ -1580,8 +1686,7 @@ tkForm.addEventListener("submit", async e => {
   }
 });
 tkForm.addEventListener("keydown", e => {
-  if (e.key === "Escape") { e.preventDefault(); closeForm(); }
-  else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); tkForm.requestSubmit(); }
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); tkForm.requestSubmit(); }
 });
 tkForm.addEventListener("focusin", renderHint);
 tkForm.addEventListener("focusout", () => setTimeout(renderHint));
