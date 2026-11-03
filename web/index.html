@@ -1372,6 +1372,8 @@ async function poll(fresh) {
     S = await api(`/api/state?all=${showAll ? 1 : 0}${fresh ? "&fresh=1" : ""}${tab === "tx" || tab === "focus" ? "&tx=1" : ""}`);
     offline = false;
     syncThemes();
+    const moved = S.moved[sel];
+    if (S.sessions.some(r => r.sid === moved)) sel = moved;
     if (sel && !S.sessions.some(r => r.sid === sel)) sel = null;
   } catch {
     offline = true;
