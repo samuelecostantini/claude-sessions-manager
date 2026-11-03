@@ -744,11 +744,25 @@ def chatlog(path):
     return log
 
 OWNED, OWN_LOCK = {}, threading.Lock()
+OWN_MOVED = {}
 OWN_MODES = ("default", "plan", "acceptEdits", "bypassPermissions")
 
 def owned(sid):
     o = OWNED.get(sid)
     return o if o and o["p"].poll() is None else None
+
+def own_move(old, new, o):
+    # /clear keeps the process but gives it a new session id, so whatever tracks the old id must follow
+    OWNED.pop(old, None)
+    OWNED[new], OWN_MOVED[old] = o, (new, time.time())
+    # a database error must not kill the reader thread: the session stays usable, only its task link goes stale
+    try: task_q(lambda c: c.execute("UPDATE tasks SET session_id = ? WHERE session_id = ?", (new, old)))
+    except Exception: pass
+
+def own_moves():
+    # recent only: later on, the old conversation can be selected again from the ended sessions
+    now = time.time()
+    return {old: new for old, (new, t) in OWN_MOVED.items() if now - t < 10}
 
 def own_write(o, obj):
     try:
@@ -764,6 +778,10 @@ def own_read(sid, o):
         try: d = json.loads(line)
         except Exception: continue
         t = d.get("type")
+        # system events, not just init: hooks run first and the session file already has the new id
+        if t == "system" and d.get("session_id") not in (None, sid):
+            own_move(sid, d["session_id"], o)
+            sid = d["session_id"]
         if t == "control_request" and (d.get("request") or {}).get("subtype") == "can_use_tool":
             r = d["request"]
             o["pend"] = dict(id=d["request_id"], tool=r.get("tool_name") or "", input=r.get("input") or {},
@@ -1800,7 +1818,7 @@ def server(port):
                     info = ps_info()
                     rows = [dict(r, tx=transcript_of(r, info)) for r in rows]
                 _, lst, cur = themes()
-                return self.reply(200, dict(sessions=rows, usage=usage_data(), chat=chat_state(), now=time.time(), projects=projects(), tasks=tasks_state(),
+                return self.reply(200, dict(sessions=rows, moved=own_moves(), usage=usage_data(), chat=chat_state(), now=time.time(), projects=projects(), tasks=tasks_state(),
                     cfg=dict(themes=lst, theme=cur["id"], projects=dict(dir=str(settings().get("projects") or "~/Projects"), env=bool(os.environ.get("CS_REPO_ROOTS"))), window=WINDOW, agent_rows=AGENT_ROWS, chat_rows=CHAT_ROWS, chat_model=CHAT_MODEL, terminal=dict(app=task_terminal(), list=terminals()), home=os.path.expanduser("~"))))
             if u.path == "/api/task":
                 tid = (parse_qs(u.query).get("id") or [""])[0]
@@ -2021,6 +2039,8 @@ else:
         while True:
             if time.time() - last >= 2:
                 data = collect()
+                new = own_moves().get(SEL)
+                if any(x["sid"] == new for x in data): SEL = new
                 PROJ = projects()
                 if VIEW == "tx":
                     info = ps_info()
