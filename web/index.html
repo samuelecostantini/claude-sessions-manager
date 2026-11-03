@@ -50,7 +50,15 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
 .tx-down { flex: none; align-self: center; position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; margin: -36px 0 8px; padding: 0; color: var(--fg); background: var(--surface, var(--bg)); border: 1px solid var(--gray); border-radius: 50%; box-shadow: 0 2px 6px rgb(0 0 0 / .25); transition: color .15s, border-color .15s; }
 .tx-down[hidden] { display: none; }
 .tx-down:hover, .tx-down:focus-visible { color: var(--orange); border-color: var(--orange); outline: 0; }
-@media (prefers-reduced-motion: reduce) { .tx-down { transition: none; } .fx-split::before, .fx-split::after, .fx-tree summary::before { transition: none; } }
+.proj-row { flex: none; display: flex; align-items: center; gap: 2px; min-width: 0; }
+.proj-row .proj { flex: 1 1 auto; min-width: 0; }
+.proj-code { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; color: var(--dim); background: none; border: 0; border-radius: 4px; cursor: pointer; transition: color .15s; }
+.proj-code svg { width: 14px; height: 14px; }
+.proj-code:hover { color: var(--orange); }
+.proj-code:focus-visible { color: var(--orange); outline: 1px solid var(--orange); }
+.proj-opt { align-items: center; }
+.proj-opt.on .proj-code { color: inherit; }
+@media (prefers-reduced-motion: reduce) { .tx-down, .proj-code { transition: none; } .fx-split::before, .fx-split::after, .fx-tree summary::before { transition: none; } }
 </style>
 <link id="theme-css" rel="stylesheet" href="__CS_THEME__">
 </head>
@@ -226,6 +234,9 @@ const ICONS = {
 };
 const ph = (name, cls = "") => `<svg class="${cls}" viewBox="0 0 256 256" width="16" height="16" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="${ICONS[name]}"/></svg>`;
 const txDownSync = lg => { lg.nextElementSibling.hidden = lg.scrollHeight - lg.scrollTop - lg.clientHeight <= 8; };
+// the VS Code logo, from Simple Icons (CC0)
+const VSCODE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z"/></svg>`;
+const codeBtn = (p, attrs = "") => `<button type="button" class="proj-code" data-path="${esc(p.path)}" data-code title="Open ${esc(home(p.path))} in VS Code" aria-label="Open ${esc(p.name)} in VS Code"${attrs}>${VSCODE_ICON}</button>`;
 const FX_ICON = ph("corners"), CHAT_ICON = ph("chat");
 document.querySelectorAll("[data-ic]").forEach(el => el.insertAdjacentHTML("afterbegin", ph(el.dataset.ic, "ic")));
 // a 2×2 grid with the cells the size covers filled in; full width is one bar across the top (both rows for full2)
@@ -898,7 +909,7 @@ function renderProjects() {
   const sig = JSON.stringify(show.map(p => [p.path, p.name]));
   if (sig !== projSig) {
     $("projList").innerHTML = show.length
-      ? show.map(p => `<button type="button" class="proj" data-path="${esc(p.path)}" title="Open ${esc(home(p.path))} in VS Code">${ph("folder", "ic")}<span>${esc(p.name)}</span></button>`).join("")
+      ? show.map(p => `<div class="proj-row"><button type="button" class="proj" data-path="${esc(p.path)}" title="Open ${esc(home(p.path))} in a session, in Focus">${ph("folder", "ic")}<span>${esc(p.name)}</span></button>${codeBtn(p)}</div>`).join("")
       : `<span class="dim">no git repos in ${esc(cfg.dir)}</span>`;
     projSig = sig;
   }
@@ -932,12 +943,29 @@ function renderMenu() {
   const hits = projMatch(q.value, S.projects || []).slice(0, 12);
   projSel = Math.max(0, Math.min(projSel, hits.length - 1));
   m.innerHTML = hits.length
-    ? hits.map((p, i) => `<div class="proj-opt${i === projSel ? " on" : ""}" role="option" aria-selected="${i === projSel}" data-path="${esc(p.path)}"><span class="n">${esc(p.name)}</span><span class="r">${esc(p.rel)}</span></div>`).join("")
+    ? hits.map((p, i) => `<div class="proj-opt${i === projSel ? " on" : ""}" role="option" aria-selected="${i === projSel}" data-path="${esc(p.path)}"><span class="n">${esc(p.name)}</span><span class="r">${esc(p.rel)}</span>${codeBtn(p, ' tabindex="-1"')}</div>`).join("")
     : `<div class="proj-none">No match</div>`;
   m.hidden = false;
   m._hits = hits;
 }
 
+async function openSession(path) {
+  try {
+    const r = await api("/api/session/new", { cwd: path, mode: $("txNew").elements.mode.value, reuse: true });
+    flash = [r.msg, Date.now()];
+    renderHint();
+    // its row only appears once claude has written its session file
+    for (let i = 0; i < 60 && !S.sessions.some(x => x.sid === r.sid); i++) {
+      await poll(true);
+      await new Promise(done => setTimeout(done, 250));
+    }
+    sel = r.sid;
+    setTab("focus");
+  } catch (e) {
+    flash = [`could not start a session: ${e.message}`, Date.now()];
+    renderHint();
+  }
+}
 async function openProject(path) {
   try { flash = [(await api("/api/open", { path })).msg, Date.now()]; }
   catch (e) { flash = [`could not open the project: ${e.message}`, Date.now()]; }
@@ -1279,7 +1307,7 @@ function render() {
 function hintKeys() {
   return chatOn()
     ? "enter send · esc close chat · ctrl-u clear line · /clear new chat"
-    : document.activeElement === $("projQ") ? "type to filter · ↑↓ select · enter open in VS Code · esc close"
+    : document.activeElement === $("projQ") ? "type to filter · ↑↓ select · enter open in Focus · esc close"
     : document.activeElement?.closest?.("#tkForm") ? "enter saves (⌘/ctrl-enter in the description) · esc cancels"
     : document.activeElement === $("tkNote") ? "enter saves the note · esc leaves"
     : document.activeElement?.classList?.contains("tx-input") ? "enter send · esc leave · ctrl-u clear line"
@@ -1512,7 +1540,7 @@ function pick(e) {
 }
 $("projList").addEventListener("click", e => {
   const el = e.target.closest("[data-path]");
-  if (el) openProject(el.dataset.path);
+  if (el) ("code" in el.dataset ? openProject : openSession)(el.dataset.path);
 });
 const projQ = $("projQ");
 projQ.addEventListener("input", () => { projSel = 0; renderMenu(); });
@@ -1521,14 +1549,14 @@ projQ.addEventListener("blur", () => { projQ.value = ""; renderMenu(); renderHin
 projQ.addEventListener("keydown", e => {
   const hits = $("projMenu")._hits || [];
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); projSel += e.key === "ArrowDown" ? 1 : -1; renderMenu(); }
-  else if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); const p = hits[projSel]; projQ.blur(); if (p) openProject(p.path); }
+  else if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); const p = hits[projSel]; projQ.blur(); if (p) openSession(p.path); }
   else if (e.key === "Escape") { e.preventDefault(); projQ.blur(); }
   else if (e.ctrlKey && (e.key === "u" || e.key === "U")) { e.preventDefault(); projQ.value = ""; projSel = 0; renderMenu(); }
 });
 $("projMenu").addEventListener("mousedown", e => {
   e.preventDefault();
   const el = e.target.closest("[data-path]");
-  if (el) { projQ.blur(); openProject(el.dataset.path); }
+  if (el) { projQ.blur(); (e.target.closest("[data-code]") ? openProject : openSession)(el.dataset.path); }
 });
 dirIn.addEventListener("input", () => { dirErr = ""; });
 dirIn.addEventListener("keydown", e => {

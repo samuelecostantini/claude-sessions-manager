@@ -174,6 +174,10 @@ The line above the chat lists the git repos you used most recently with Claude (
 folder: type to filter, arrows select, Enter opens, Esc closes. In the web view they are in the sidebar
 with a search box (older themes show a row of chips); the projects folder is set in Settings.
 
+In the web view, clicking a project (or pressing Enter in its search) opens a session there in Focus,
+going back to the one cs already runs in that folder if there is one. The VS Code icon next to it opens
+the project in VS Code.
+
 The projects folder is `projects` in `.settings.json` (default `~/Projects`, colon-separate several).
 Repos are found up to three levels deep. `CS_REPO_ROOTS`, if set, overrides it. Projects open
 with `open -a "Visual Studio Code"`, so VS Code must be installed.

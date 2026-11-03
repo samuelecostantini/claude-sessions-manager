@@ -1866,6 +1866,9 @@ def server(port):
                 return self.reply(200, {"msg": focus(row) if row else "session not found"})
             if u.path == "/api/session/new":
                 cwd = os.path.expanduser(str(body.get("cwd") or "").strip())
+                # clicking a project twice must not start a second session
+                sid = body.get("reuse") and next((s for s, o in list(OWNED.items()) if o["cwd"] == cwd and owned(s)), None)
+                if sid: return self.reply(200, {"sid": sid, "msg": f"back to the session in {os.path.basename(cwd)}"})
                 sid, err = own_start(cwd, None, str(body.get("mode") or "default"), str(body.get("text") or ""))
                 with lock: cache.clear()
                 return self.reply(400, {"error": err}) if err else self.reply(200, {"sid": sid, "msg": f"started a session in {os.path.basename(cwd)}"})
