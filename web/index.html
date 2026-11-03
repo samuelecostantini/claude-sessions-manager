@@ -30,6 +30,21 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
 .keys-list dt { font-family: var(--mono, monospace); font-size: 12px; white-space: nowrap; }
 .keys-list dd { margin: 0; color: var(--dim); }
 .keys-list dd::first-letter { text-transform: uppercase; }
+.tx-view.fx { position: relative; }
+/* in the gap left of the editor's grid cell, outside the panes because they clip their overflow */
+.fx-split { position: absolute; grid-area: 2 / 3; z-index: 1; top: 0; bottom: 0; left: -14px; width: 14px; cursor: col-resize; touch-action: none; }
+.fx-split::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; transform: translateX(-50%); background: var(--gray); opacity: .35; transition: opacity .15s, background .15s; }
+.fx-split::after { content: ""; position: absolute; top: 50%; left: 50%; width: 4px; height: 36px; border-radius: 2px; transform: translate(-50%, -50%); background: var(--gray); transition: background .15s; }
+.fx-split:hover::before, .fx-split:focus-visible::before { background: var(--orange); opacity: 1; }
+.fx-split:hover::after, .fx-split:focus-visible::after { background: var(--orange); }
+.fx-split:focus-visible { outline: 0; }
+.fx-tree summary { list-style: none; }
+.fx-tree summary::-webkit-details-marker { display: none; }
+.fx-tree summary::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px; background: currentColor; opacity: .7; transition: transform .15s; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5.75 3 10.75 8l-5 5' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; }
+.fx-tree details[open] > summary::before { transform: rotate(90deg); }
+/* sits in the file's left padding, under the folder chevrons, so file and folder names stay aligned */
+.fx-tree .fx-file::before { content: ""; display: inline-block; width: 12px; height: 12px; margin: 0 2px 0 -14px; vertical-align: -1px; background: currentColor; opacity: .7; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 1.75h5.25L12.75 5.25V14.25H4zM9.25 1.75V5.25H12.75' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; }
+@media (prefers-reduced-motion: reduce) { .fx-split::before, .fx-split::after, .fx-tree summary::before { transition: none; } }
 </style>
 <link id="theme-css" rel="stylesheet" href="__CS_THEME__">
 </head>
@@ -54,7 +69,8 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
       <div class="tk-bar fx-only"><label class="tk-auto">Session <select id="fxSel" aria-label="Session"></select></label></div>
       <aside class="chat fx-pane fx-only" aria-label="Codebase"><div class="chat-head"><span class="chat-title">Files</span><span class="chat-side" id="fxCodeSide"></span></div><div class="chat-log fx-tree" id="fxCode"></div></aside>
       <div class="txs" id="txs"></div>
-      <aside class="chat fx-pane fx-ed fx-only" aria-label="File editor"><div class="fx-split" id="fxSplit" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize chat and editor" aria-valuemin="20" aria-valuemax="80" title="Drag to resize the chat and the editor"></div><div class="chat-head"><span class="chat-title">Editor</span><span class="chat-side" id="fxEdPath"></span><button type="button" class="tk-btn" id="fxEdSave" title="Save (⌘/ctrl-S)" disabled>Save</button></div><div class="fx-editor" id="fxEdWrap"><pre class="fx-nums" id="fxEdNums" aria-hidden="true"></pre><div class="fx-edmain"><div class="fx-curline" id="fxEdLine" hidden></div><pre class="fx-hl" id="fxEdHl" aria-hidden="true"></pre><textarea id="fxEd" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File contents" placeholder="Click a file to open it here" readonly></textarea></div></div></aside>
+      <div class="fx-split fx-only" id="fxSplit" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize chat and editor" aria-valuemin="20" aria-valuemax="80" title="Drag to resize the chat and the editor"></div>
+      <aside class="chat fx-pane fx-ed fx-only" aria-label="File editor"><div class="chat-head"><span class="chat-title">Editor</span><span class="chat-side" id="fxEdPath"></span><button type="button" class="tk-btn" id="fxEdSave" title="Save (⌘/ctrl-S)" disabled>Save</button></div><div class="fx-editor" id="fxEdWrap"><pre class="fx-nums" id="fxEdNums" aria-hidden="true"></pre><div class="fx-edmain"><div class="fx-curline" id="fxEdLine" hidden></div><pre class="fx-hl" id="fxEdHl" aria-hidden="true"></pre><textarea id="fxEd" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File contents" placeholder="Click a file to open it here" readonly></textarea></div></div></aside>
       <div class="fx-right fx-only">
         <aside class="chat fx-pane" aria-label="Git status"><div class="chat-head"><span class="chat-title">Git Status</span></div><form class="fx-git" id="fxGitBar" hidden><input name="msg" placeholder="Commit message" aria-label="Commit message" spellcheck="false" autocomplete="off"><button type="button" class="tk-btn" data-git="message" title="Write the message with Claude, from what commit would take: it reads the diff">Generate</button><button type="submit" class="tk-btn" title="Commit what is staged, or every change if nothing is staged">Commit</button><button type="button" class="tk-btn" data-git="push">Push</button><button type="button" class="tk-btn" data-git="fetch">Fetch</button><div class="fx-git-out" id="fxGitOut" role="status"></div></form><div class="chat-log" id="fxGit"></div></aside>
         <aside class="chat fx-pane" aria-label="Session information"><div class="chat-head"><span class="chat-title">Session</span></div><div class="chat-log" id="fxInfo"></div></aside>
@@ -1601,7 +1617,7 @@ $("fxSplit").addEventListener("mousedown", e => e.preventDefault());
 $("fxSplit").addEventListener("pointerdown", e => $("fxSplit").setPointerCapture(e.pointerId));
 $("fxSplit").addEventListener("pointermove", e => {
   if (!$("fxSplit").hasPointerCapture(e.pointerId)) return;
-  const left = $("txs").getBoundingClientRect().left, right = $("fxSplit").parentElement.getBoundingClientRect().right;
+  const left = $("txs").getBoundingClientRect().left, right = $("fxSplit").nextElementSibling.getBoundingClientRect().right;
   fxSplitSet((e.clientX - left) / (right - left) * 100);
 });
 $("fxSplit").addEventListener("keydown", e => {
