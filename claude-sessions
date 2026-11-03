@@ -1722,13 +1722,89 @@ def chat_view(cols):
         out += [row(x) for x in log[-CHAT_ROWS:]] + [f"{bd}├{'─' * (W - 2)}┤{Z}"]
     return out + [row(field), f"{bd}╰{'─' * (W - 2)}╯{Z}"]
 
+import fcntl, select, struct, termios
+# the Focus view's terminals, one shell per folder; they outlive the page, and end with this process (closing the master hangs them up)
+PTYS, PTYS_LOCK, PTY_KEEP = {}, threading.Lock(), 1 << 18
+# python ignores these signals and exec keeps that; setsid alone gives no controlling tty on macOS, and ctrl-c needs one
+PTY_EXEC = ("import fcntl, os, signal, sys, termios; signal.signal(signal.SIGPIPE, signal.SIG_DFL); signal.signal(signal.SIGXFSZ, signal.SIG_DFL); "
+            "fcntl.ioctl(0, termios.TIOCSCTTY, 0); os.execv(sys.argv[1], sys.argv[1:])")
+
+def pty_size(p, cols, rows):
+    fcntl.ioctl(p["fd"], termios.TIOCSWINSZ, struct.pack("HHHH", max(1, min(rows, 1000)), max(1, min(cols, 1000)), 0, 0))
+
+def pty_open(cwd, cols, rows):
+    with PTYS_LOCK:
+        p = PTYS.get(cwd)
+        if p:
+            pty_size(p, cols, rows)
+            return p
+        fd, slave = os.openpty()
+        try:
+            p = dict(fd=fd, buf=b"", end=0, done=False, cond=threading.Condition(), wlock=threading.Lock())
+            pty_size(p, cols, rows)
+            sh = os.environ.get("SHELL") or "/bin/zsh"
+            # a launchd-started cs has no LANG, and the shell would then not speak UTF-8
+            env = {"LANG": "en_US.UTF-8", **os.environ, "TERM": "xterm-256color", "COLORTERM": "truecolor"}
+            # these belong to the tab that started cs: with them zsh would restore and overwrite that tab's saved session
+            for k in ("TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TERM_SESSION_ID", "ITERM_SESSION_ID"): env.pop(k, None)
+            p["proc"] = subprocess.Popen([sys.executable, "-Ic", PTY_EXEC, sh, "-l"], cwd=cwd, env=env, stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
+        except BaseException:
+            os.close(fd)
+            raise
+        finally:
+            os.close(slave)
+        PTYS[cwd] = p
+        threading.Thread(target=pty_pump, args=(cwd, p), daemon=True).start()
+        return p
+
+def pty_pump(cwd, p):
+    while True:
+        # a background job can keep the tty open after the shell exits, so EOF alone is not enough
+        if not select.select([p["fd"]], [], [], 1)[0]:
+            if p["proc"].poll() is None: continue
+            break
+        try: data = os.read(p["fd"], 65536)
+        except OSError: break
+        if not data: break
+        with p["cond"]:
+            p["buf"] = (p["buf"] + data)[-PTY_KEEP:]
+            p["end"] += len(data)
+            p["cond"].notify_all()
+    p["proc"].wait()
+    with PTYS_LOCK: PTYS.pop(cwd, None)
+    with p["wlock"]: os.close(p["fd"]); p["fd"] = -1
+    with p["cond"]:
+        p["done"] = True
+        p["cond"].notify_all()
+
+def pty_write(cwd, text):
+    p = PTYS.get(cwd)
+    if not p: return False
+    data = text.encode("utf-8", "replace")
+    # the lock keeps pty_pump from closing the fd, and its number being reused, mid-write
+    with p["wlock"]:
+        try:
+            while data and p["fd"] >= 0: data = data[os.write(p["fd"], data):]
+        except OSError: return False
+    return not data
+
+def pty_chunk(p, at, alive=lambda: True):
+    """Waits for output past offset at: returns (data, new offset), or None when the shell ended or alive() turns false."""
+    with p["cond"]:
+        while p["end"] == at:
+            if p["done"] or not alive(): return None
+            p["cond"].wait(5)
+        # a reader further behind than PTY_KEEP skips ahead
+        return p["buf"][max(0, at - p["end"] + len(p["buf"])):], p["end"]
+
 def server(port):
     import threading, secrets
     from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
     from urllib.parse import urlparse, parse_qs
     web = os.path.join(ROOT, "web")
     page = os.path.join(web, "index.html")
-    STATIC = {"/manifest.webmanifest": "application/manifest+json", "/sw.js": "text/javascript; charset=utf-8"}
+    STATIC = {"/manifest.webmanifest": "application/manifest+json", "/sw.js": "text/javascript; charset=utf-8",
+              "/vendor/xterm.js": "text/javascript; charset=utf-8", "/vendor/addon-fit.js": "text/javascript; charset=utf-8", "/vendor/xterm.css": "text/css; charset=utf-8"}
     token = secrets.token_urlsafe(24)
     cache, lock = {}, threading.Lock()
 
@@ -1767,6 +1843,8 @@ def server(port):
             return dict(list=[], err=f"tasks db: {e}", inbox=None)
 
     class H(BaseHTTPRequestHandler):
+        # a typed key's echo must not wait for the previous packet's ACK
+        disable_nagle_algorithm = True
         def log_message(self, *a): pass
 
         def reply(self, code, body, ctype="application/json; charset=utf-8"):
@@ -1833,6 +1911,25 @@ def server(port):
                 sid = (parse_qs(u.query).get("sid") or [""])[0]
                 row = row_of(sid)
                 return self.reply(200, session_code(row["cwd"])) if row else self.reply(404, {"error": "session not found"})
+            if u.path == "/api/session/pty":
+                q = parse_qs(u.query)
+                row = row_of((q.get("sid") or [""])[0])
+                if not row: return self.reply(404, {"error": "session not found"})
+                try: p = pty_open(row["cwd"], int((q.get("cols") or ["80"])[0]), int((q.get("rows") or ["24"])[0]))
+                except (OSError, ValueError) as e: return self.reply(400, {"error": f"cannot start a shell in {row['cwd']}: {e}"})
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                at = 0
+                try:
+                    # the page sends nothing after its request, so a readable socket means it went away
+                    while c := pty_chunk(p, at, lambda: not select.select([self.connection], [], [], 0)[0]):
+                        self.wfile.write(c[0])
+                        at = c[1]
+                except OSError: pass
+                return
             if u.path == "/api/session/file":
                 q = parse_qs(u.query)
                 sid = (q.get("sid") or [""])[0]
@@ -1855,6 +1952,15 @@ def server(port):
                 row = row_of(sid)
                 if not row: return self.reply(404, {"error": "session not found"})
                 return self.reply(200, session_file(row["cwd"], str(body.get("path") or ""), body["text"], body.get("base"), body.get("force") is True))
+            if u.path == "/api/session/pty":
+                cwd = str(body.get("cwd") or "")
+                p = PTYS.get(cwd)
+                if not p: return self.reply(404, {"error": "no shell there"})
+                try:
+                    if "text" in body: pty_write(cwd, str(body["text"]))
+                    else: pty_size(p, int(body.get("cols")), int(body.get("rows")))
+                except (OSError, TypeError, ValueError) as e: return self.reply(400, {"error": str(e)})
+                return self.reply(200, {})
             if u.path == "/api/session/git":
                 sid = body.get("sid")
                 row = row_of(sid)
@@ -1867,9 +1973,11 @@ def server(port):
             if u.path == "/api/session/new":
                 cwd = os.path.expanduser(str(body.get("cwd") or "").strip())
                 # clicking a project twice must not start a second session
-                sid = body.get("reuse") and next((s for s, o in list(OWNED.items()) if o["cwd"] == cwd and owned(s)), None)
+                mode = str(body.get("mode") or "default")
+                # only the same mode: the CLI refuses to switch a running session to bypassPermissions
+                sid = body.get("reuse") and next((s for s, o in list(OWNED.items()) if o["cwd"] == cwd and o["mode"] == mode and owned(s)), None)
                 if sid: return self.reply(200, {"sid": sid, "msg": f"back to the session in {os.path.basename(cwd)}"})
-                sid, err = own_start(cwd, None, str(body.get("mode") or "default"), str(body.get("text") or ""))
+                sid, err = own_start(cwd, None, mode, str(body.get("text") or ""))
                 with lock: cache.clear()
                 return self.reply(400, {"error": err}) if err else self.reply(200, {"sid": sid, "msg": f"started a session in {os.path.basename(cwd)}"})
             if u.path in ("/api/session/answer", "/api/session/stop"):

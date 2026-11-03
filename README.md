@@ -45,11 +45,18 @@ every change including untracked files if nothing is staged. `push` asks first, 
 `generate` fills in the message with a headless `claude -p` (`$CS_CHAT_MODEL`), for you to edit before committing. It sees the
 diff of what `commit` would take (first 30k characters), the names of new files and the recent commit subjects.
 
+The button in the `Files` title collapses that pane to a thin rail and gives its width to the others; the choice is remembered.
+
 Click a file in the codebase to edit it, `⌘/ctrl-S` or `save` writes it. The editor has line numbers, indent guides,
 syntax colors (JS/TS, Python, shell, PHP, C-family, CSS, HTML, JSON, YAML/TOML, Markdown; files over 150 KB stay plain)
 and keeps the indentation on enter; `tab` and `shift-tab` indent and outdent the selected lines. Files over 1 MB, binary files and files
 outside the session's folder don't open. An unchanged editor follows the disk; if a file you changed also changed
 on disk, saving asks before overwriting.
+
+The switch in the pane's title flips it between `Editor` and `Terminal`; the choice is remembered, and clicking a file goes back to the
+editor. The terminal is a real shell (`$SHELL -l`, [xterm.js](https://xtermjs.org) vendored in `web/vendor/`) in the session's folder, so sessions
+in the same folder share one. It keeps running while the pane shows something else, and its last 256 KB of output replays when you come back.
+Keys go to the shell: `shift-esc` leaves it. Shells end when you `exit` them or when `cs` quits.
 
 ### Sessions run by cs
 
@@ -175,8 +182,9 @@ folder: type to filter, arrows select, Enter opens, Esc closes. In the web view 
 with a search box (older themes show a row of chips); the projects folder is set in Settings.
 
 In the web view, clicking a project (or pressing Enter in its search) opens a session there in Focus,
-going back to the one cs already runs in that folder if there is one. The VS Code icon next to it opens
-the project in VS Code.
+with `Skip all permissions` (`bypassPermissions`), so nothing stops it from running any command. It goes
+back to the session cs already runs there in that mode if there is one; a session in another mode is left
+alone and a new one starts. The VS Code icon next to it opens the project in VS Code.
 
 The projects folder is `projects` in `.settings.json` (default `~/Projects`, colon-separate several).
 Repos are found up to three levels deep. `CS_REPO_ROOTS`, if set, overrides it. Projects open

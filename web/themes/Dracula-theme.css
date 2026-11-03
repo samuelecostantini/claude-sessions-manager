@@ -227,11 +227,10 @@ kbd { font: inherit; color: var(--fg); }
 .projects { display: flex; align-items: center; gap: 6px 10px; min-width: 0; font-size: 12px; }
 .proj-label { color: var(--comment); flex: none; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
 .proj-list { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; height: 24px; overflow: hidden; }
-.proj {
-  font: 12px var(--sans); color: var(--fg); background: var(--surface); white-space: nowrap; cursor: pointer;
-  border: 1px solid var(--sel); border-radius: 4px; padding: 3px 9px; height: 24px; transition: border-color .15s, color .15s;
-}
-.proj:hover, .proj:focus-visible { border-color: var(--orange); color: var(--orange); outline: 0; }
+.proj-row { height: 24px; padding-right: 3px; background: var(--surface); border: 1px solid var(--sel); border-radius: 4px; transition: border-color .15s; }
+.proj-row:hover, .proj-row:focus-within { border-color: var(--orange); }
+.proj { font: 12px var(--sans); color: var(--fg); background: none; white-space: nowrap; cursor: pointer; border: 0; padding: 0 3px 0 9px; height: 100%; transition: color .15s; }
+.proj:hover, .proj:focus-visible { color: var(--orange); outline: 0; }
 .proj-find { position: relative; flex: none; width: 200px; }
 #projQ { width: 100%; font: 12px var(--sans); color: var(--fg); background: var(--bg); border: 1px solid var(--sel); border-radius: 4px; padding: 4px 8px; outline: 0; caret-color: var(--orange); }
 #projQ:focus { border-color: var(--orange); }
