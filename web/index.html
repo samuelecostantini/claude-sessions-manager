@@ -31,6 +31,30 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
 .keys-list dd { margin: 0; color: var(--dim); }
 .keys-list dd::first-letter { text-transform: uppercase; }
 .tx-view.fx { position: relative; }
+.fx-files .chat-head .fx-files-btn { flex: none; display: grid; place-items: center; box-sizing: border-box; width: 24px; height: 22px; padding: 0; pointer-events: auto; }
+.fx-files-btn .ic { display: block; margin: 0; }
+.fx-files .chat-head { align-items: center; }
+.fx-files .chat-side { flex: 1; min-width: 0; }
+/* the rail keeps only the button; themes differ on the head, so it is reset here. Selectors outrank the themes' own, loaded after this */
+.tx-view.fx.fx-nofiles .fx-files { padding: 6px 0; align-items: center; }
+.tx-view.fx.fx-nofiles .fx-files .chat-head { position: static; justify-content: center; margin: 0; padding: 0; border: 0; background: none; }
+.tx-view.fx.fx-nofiles .fx-files .chat-title, .tx-view.fx.fx-nofiles .fx-files .chat-side, .tx-view.fx.fx-nofiles .fx-files .fx-tree { display: none; }
+@media (min-width: 901px) { .tx-view.fx.fx-nofiles:not([hidden]) { grid-template-columns: 38px minmax(0, var(--fx-chat, 2fr)) minmax(0, var(--fx-ed, 2fr)) minmax(170px, .8fr); } }
+@media (max-width: 900px) { .tx-view.fx.fx-nofiles .fx-files { height: auto; } }
+/* native radios underneath: arrow keys and screen readers work; the opaque track also suits themes whose titles sit on the pane's border */
+.fx-switch { position: relative; flex: none; display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 6px; pointer-events: auto; background: color-mix(in srgb, var(--fg) 12%, var(--bg)); }
+.fx-switch::before { content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 4px; background: var(--orange); box-shadow: 0 1px 2px rgba(0, 0, 0, .3); transition: transform .18s ease; }
+.fx-switch:has(input[value="terminal"]:checked)::before { transform: translateX(100%); }
+.fx-switch:has(input:focus-visible) { outline: 2px solid var(--orange); outline-offset: 2px; }
+.fx-switch label { position: relative; padding: 3px 14px; font-size: 12px; font-weight: 500; line-height: 18px; text-align: center; color: var(--dim); cursor: pointer; transition: color .18s ease; }
+.fx-switch label:hover { color: var(--fg); }
+.fx-switch label:has(:checked) { color: var(--bg); }
+.fx-switch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.fx-ed [hidden] { display: none !important; }
+.fx-term { flex: 1; min-height: 0; padding: 6px 0 0 8px; overflow: hidden; }
+.fx-term .xterm { height: 100%; }
+/* the rows rarely fill the pane exactly: what is left over shows the pane, not xterm's black */
+.fx-term .xterm-viewport { background: none !important; }
 /* in the gap left of the editor's grid cell, outside the panes because they clip their overflow */
 .fx-split { position: absolute; grid-area: 2 / 3; z-index: 1; top: 0; bottom: 0; left: -14px; width: 14px; cursor: col-resize; touch-action: none; }
 .fx-split::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; transform: translateX(-50%); background: var(--gray); opacity: .35; transition: opacity .15s, background .15s; }
@@ -50,8 +74,20 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
 .tx-down { flex: none; align-self: center; position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; margin: -36px 0 8px; padding: 0; color: var(--fg); background: var(--surface, var(--bg)); border: 1px solid var(--gray); border-radius: 50%; box-shadow: 0 2px 6px rgb(0 0 0 / .25); transition: color .15s, border-color .15s; }
 .tx-down[hidden] { display: none; }
 .tx-down:hover, .tx-down:focus-visible { color: var(--orange); border-color: var(--orange); outline: 0; }
-@media (prefers-reduced-motion: reduce) { .tx-down { transition: none; } .fx-split::before, .fx-split::after, .fx-tree summary::before { transition: none; } }
+.fx-nav { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.fx-nav .tk-btn { display: grid; place-items: center; width: 28px; height: 24px; padding: 0; }
+.fx-nav .ic { display: block; }
+.proj-row { flex: none; display: flex; align-items: center; gap: 2px; min-width: 0; }
+.proj-row .proj { flex: 1 1 auto; min-width: 0; }
+.proj-code { flex: none; display: grid; place-items: center; width: 18px; height: 18px; padding: 0; color: var(--dim); background: none; border: 0; border-radius: 4px; cursor: pointer; transition: color .15s; }
+.proj-code svg { width: 11px; height: 11px; }
+.proj-code:hover { color: var(--orange); }
+.proj-code:focus-visible { color: var(--orange); outline: 1px solid var(--orange); }
+.proj-opt { align-items: center; }
+.proj-opt.on .proj-code { color: inherit; }
+@media (prefers-reduced-motion: reduce) { .tx-down, .proj-code, .fx-switch::before, .fx-switch label { transition: none; } .fx-split::before, .fx-split::after, .fx-tree summary::before { transition: none; } }
 </style>
+<link rel="stylesheet" href="/vendor/xterm.css">
 <link id="theme-css" rel="stylesheet" href="__CS_THEME__">
 </head>
 <body>
@@ -72,11 +108,11 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
     <div class="tiles" id="tiles"></div>
     <div class="tbl-wrap" id="table" hidden></div>
     <section class="tx-view" id="txView" aria-label="Transcripts" hidden>
-      <div class="tk-bar fx-only"><label class="tk-auto">Session <select id="fxSel" aria-label="Session"></select></label></div>
-      <aside class="chat fx-pane fx-only" aria-label="Codebase"><div class="chat-head"><span class="chat-title">Files</span><span class="chat-side" id="fxCodeSide"></span></div><div class="chat-log fx-tree" id="fxCode"></div></aside>
+      <div class="tk-bar fx-only"><label class="tk-auto">Session <select id="fxSel" aria-label="Session"></select></label><div class="fx-nav" id="fxNav" role="group" aria-label="Switch session"><button type="button" class="tk-btn" id="fxPrev" data-ic="left" data-key="ArrowLeft" title="Previous session (←)" aria-label="Previous session"></button><button type="button" class="tk-btn" id="fxNext" data-ic="right" data-key="ArrowRight" title="Next session (→)" aria-label="Next session"></button></div></div>
+      <aside class="chat fx-pane fx-files fx-only" aria-label="Codebase"><div class="chat-head"><span class="chat-title">Files</span><span class="chat-side" id="fxCodeSide"></span><button type="button" class="tk-btn fx-files-btn" id="fxFilesBtn" data-ic="sidebar" aria-controls="fxCode"></button></div><div class="chat-log fx-tree" id="fxCode"></div></aside>
       <div class="txs" id="txs"></div>
       <div class="fx-split fx-only" id="fxSplit" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize chat and editor" aria-valuemin="20" aria-valuemax="80" title="Drag to resize the chat and the editor"></div>
-      <aside class="chat fx-pane fx-ed fx-only" aria-label="File editor"><div class="chat-head"><span class="chat-title">Editor</span><span class="chat-side" id="fxEdPath"></span><button type="button" class="tk-btn" id="fxEdSave" title="Save (⌘/ctrl-S)" disabled>Save</button></div><div class="fx-editor" id="fxEdWrap"><pre class="fx-nums" id="fxEdNums" aria-hidden="true"></pre><div class="fx-edmain"><div class="fx-curline" id="fxEdLine" hidden></div><pre class="fx-hl" id="fxEdHl" aria-hidden="true"></pre><textarea id="fxEd" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File contents" placeholder="Click a file to open it here" readonly></textarea></div></div></aside>
+      <aside class="chat fx-pane fx-ed fx-only" aria-label="Editor or terminal"><div class="chat-head"><div class="fx-switch" id="fxMode" role="radiogroup" aria-label="Section type"><label><input type="radio" name="fxmode" value="editor">Editor</label><label><input type="radio" name="fxmode" value="terminal">Terminal</label></div><span class="chat-side" id="fxEdPath"></span><button type="button" class="tk-btn" id="fxEdSave" title="Save (⌘/ctrl-S)" disabled>Save</button></div><div class="fx-editor" id="fxEdWrap"><pre class="fx-nums" id="fxEdNums" aria-hidden="true"></pre><div class="fx-edmain"><div class="fx-curline" id="fxEdLine" hidden></div><pre class="fx-hl" id="fxEdHl" aria-hidden="true"></pre><textarea id="fxEd" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File contents" placeholder="Click a file to open it here" readonly></textarea></div></div><div class="fx-term" id="fxTerm" hidden></div></aside>
       <div class="fx-right fx-only">
         <aside class="chat fx-pane" aria-label="Git status"><div class="chat-head"><span class="chat-title">Git Status</span></div><form class="fx-git" id="fxGitBar" hidden><input name="msg" placeholder="Commit message" aria-label="Commit message" spellcheck="false" autocomplete="off"><button type="button" class="tk-btn" data-git="message" title="Write the message with Claude, from what commit would take: it reads the diff">Generate</button><button type="submit" class="tk-btn" title="Commit what is staged, or every change if nothing is staged">Commit</button><button type="button" class="tk-btn" data-git="push">Push</button><button type="button" class="tk-btn" data-git="fetch">Fetch</button><div class="fx-git-out" id="fxGitOut" role="status"></div></form><div class="chat-log" id="fxGit"></div></aside>
         <aside class="chat fx-pane" aria-label="Session information"><div class="chat-head"><span class="chat-title">Session</span></div><div class="chat-log" id="fxInfo"></div></aside>
@@ -172,6 +208,8 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
     <div class="sheet-acts"><span class="tk-err" id="tkErr" role="alert"></span><button type="button" class="tk-btn" id="tkCancel">Cancel</button><button type="submit" class="tk-btn primary">Save</button></div>
   </form>
 </dialog>
+<script src="/vendor/xterm.js"></script>
+<script src="/vendor/addon-fit.js"></script>
 <script>
 "use strict";
 const TOKEN = "__CS_TOKEN__";
@@ -206,6 +244,8 @@ let tkSel = null, tkCur = null, tkLoading = null, tkMode = null, tkSig = "", tkI
 let txSizes = {}, txOrder = [], txDrag = null, txScrollTo = null;
 let fxSid = null, fxT = 0, fxData = null;
 let fxEdit = null, fxReq = 0, fxEdLines = 0;
+let fxMode = store.get("cs.fxmode") === "terminal" ? "terminal" : "editor";
+let fxTerm = null, fxFit = null, fxTermCwd = null, fxTermCtl = null, fxTermOut = "", fxTermBusy = false, fxTermOver = false, fxTermT = 0;
 try { txSizes = JSON.parse(store.get("cs.txsize") || "{}") || {}; } catch {}
 try { txOrder = JSON.parse(store.get("cs.txorder") || "[]") || []; } catch {}
 const TX_SIZES = ["1x1", "2x1", "2x2", "full", "full2"];
@@ -222,10 +262,15 @@ const ICONS = {
   rows: "M208,136H48a16,16,0,0,0-16,16v40a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,56H48V152H208v40Zm0-144H48A16,16,0,0,0,32,64v40a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V64A16,16,0,0,0,208,48Zm0,56H48V64H208v40Z",
   folder: "M216,72H130.67L102.93,51.2a16.12,16.12,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V200a16,16,0,0,0,16,16H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V64H93.33L123.2,86.4A8,8,0,0,0,128,88h88Z",
   down: "M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z",
+  left: "M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z",
+  right: "M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z",
   chat: "M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z",
 };
 const ph = (name, cls = "") => `<svg class="${cls}" viewBox="0 0 256 256" width="16" height="16" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="${ICONS[name]}"/></svg>`;
 const txDownSync = lg => { lg.nextElementSibling.hidden = lg.scrollHeight - lg.scrollTop - lg.clientHeight <= 8; };
+// the VS Code logo, from Simple Icons (CC0)
+const VSCODE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z"/></svg>`;
+const codeBtn = (p, attrs = "") => `<button type="button" class="proj-code" data-path="${esc(p.path)}" data-code title="Open ${esc(home(p.path))} in VS Code" aria-label="Open ${esc(p.name)} in VS Code"${attrs}>${VSCODE_ICON}</button>`;
 const FX_ICON = ph("corners"), CHAT_ICON = ph("chat");
 document.querySelectorAll("[data-ic]").forEach(el => el.insertAdjacentHTML("afterbegin", ph(el.dataset.ic, "ic")));
 // a 2×2 grid with the cells the size covers filled in; full width is one bar across the top (both rows for full2)
@@ -770,6 +815,103 @@ async function fxGitRun(action) {
   fxLoad(sid);
 }
 
+function fxFilesSet(open) {
+  store.set("cs.fxfiles", open ? "1" : "0");
+  $("txView").classList.toggle("fx-nofiles", !open);
+  const b = $("fxFilesBtn"), label = open ? "Hide files" : "Show files";
+  b.title = label;
+  b.setAttribute("aria-label", label);
+  b.setAttribute("aria-expanded", String(open));
+}
+
+function fxModeSet(m) {
+  fxMode = m;
+  store.set("cs.fxmode", m);
+  $("fxMode").querySelector(`[value="${m}"]`).checked = true;
+  const on = m === "terminal";
+  $("fxEdWrap").hidden = $("fxEdPath").hidden = $("fxEdSave").hidden = on;
+  $("fxTerm").hidden = !on;
+  fxTermSync();
+  if (on) fxTerm?.focus();
+}
+
+function fxTermStyle() {
+  const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue(n).trim();
+  // the pane's own color; some themes leave panes transparent over --bg
+  const pane = getComputedStyle($("fxTerm").parentElement).backgroundColor, bg = /^(transparent|rgba\(.*, 0\))$/.test(pane) ? v("--bg") : pane;
+  return { fontFamily: v("--mono") || "monospace", fontSize: parseFloat(getComputedStyle($("fxEd")).fontSize) || 12.5, theme: { background: bg, foreground: v("--fg"), cursor: v("--fg"), cursorAccent: bg, selectionBackground: "rgba(128, 128, 128, .4)" } };
+}
+
+function fxTermInit() {
+  fxTerm = new Terminal({ scrollback: 5000, ...fxTermStyle() });
+  fxFit = new FitAddon.FitAddon();
+  fxTerm.loadAddon(fxFit);
+  fxTerm.open($("fxTerm"));
+  // esc and tab belong to the shell, so shift-esc is the way out of the keyboard trap
+  fxTerm.attachCustomKeyEventHandler(e => { if (e.type === "keydown" && e.key === "Escape" && e.shiftKey) { fxTerm.blur(); return false; } return true; });
+  fxTerm.onData(d => {
+    if (fxTermOver) { fxTermCwd = null; fxTermSync(); return; }
+    fxTermOut += d;
+    fxTermFlush();
+  });
+  fxTerm.onResize(({ cols, rows }) => {
+    clearTimeout(fxTermT);
+    fxTermT = setTimeout(() => { if (fxTermCwd && !fxTermOver) api("/api/session/pty", { cwd: fxTermCwd, cols, rows }).catch(() => {}); }, 100);
+  });
+  new ResizeObserver(() => { if ($("fxTerm").offsetWidth) fxFit.fit(); }).observe($("fxTerm"));
+}
+
+// one post at a time: parallel ones could reach the shell out of order
+async function fxTermFlush() {
+  if (fxTermBusy) return;
+  fxTermBusy = true;
+  while (fxTermOut && fxTermCwd) {
+    const text = fxTermOut.slice(0, 16384);
+    fxTermOut = fxTermOut.slice(text.length);
+    try { await api("/api/session/pty", { cwd: fxTermCwd, text }); }
+    catch { fxTermOut = ""; }
+  }
+  fxTermBusy = false;
+}
+
+async function fxTermStream(r, ctl) {
+  let why = "shell exited";
+  try {
+    fxFit.fit();
+    const res = await fetch(`/api/session/pty?sid=${encodeURIComponent(r.sid)}&cols=${fxTerm.cols}&rows=${fxTerm.rows}`, { headers: { "X-CS-Token": TOKEN }, signal: ctl.signal });
+    if (res.status === 403) reloadForToken();
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+    const rd = res.body.getReader();
+    for (;;) {
+      const { done, value } = await rd.read();
+      if (done || ctl !== fxTermCtl) break;
+      // waiting for the parser lets a flood of output back up to the server, which skips ahead
+      await new Promise(ok => fxTerm.write(value, ok));
+    }
+  } catch (e) {
+    if (e.name === "AbortError") return;
+    why = e.message;
+  }
+  if (ctl !== fxTermCtl) return;
+  fxTermOver = true;
+  fxTerm.write(`\r\n\x1b[2m[${why}: press any key for a new shell]\x1b[0m\r\n`);
+}
+
+// the stream runs only while the terminal shows; the shell keeps running without it
+function fxTermSync() {
+  const r = tab === "focus" && fxMode === "terminal" ? S?.sessions.find(x => x.sid === fxSid) : null, cwd = r?.cwd ?? null;
+  if (cwd === fxTermCwd) return;
+  fxTermCtl?.abort();
+  fxTermCtl = null;
+  fxTermCwd = cwd;
+  fxTermOut = "";
+  if (!r) return;
+  if (!fxTerm) fxTermInit();
+  fxTerm.reset();
+  fxTermOver = false;
+  fxTermStream(r, fxTermCtl = new AbortController());
+}
+
 function fxInfoHTML(r) {
   const w = win(r), tk = (S.tasks?.list || []).find(x => x.session_id === r.sid), t = r.tx;
   const { nrun, ndone } = agentCounts(r);
@@ -788,6 +930,8 @@ function renderFocus(rows) {
   const pick = $("fxSel"), opts = rows.map(r => [r.sid, `${r.name || r.sid.slice(0, 8)} · ${r.proj}`]), psig = JSON.stringify(opts);
   if (pick._sig !== psig) { pick.replaceChildren(...opts.map(o => new Option(o[1], o[0]))); pick._sig = psig; }
   if (document.activeElement !== pick && sel) pick.value = sel;
+  $("fxPrev").disabled = sel === rows[0]?.sid;
+  $("fxNext").disabled = sel === rows.at(-1)?.sid;
   const r = rows.find(x => x.sid === sel);
   if (!r) return;
   if (r.sid !== fxSid) {
@@ -898,7 +1042,7 @@ function renderProjects() {
   const sig = JSON.stringify(show.map(p => [p.path, p.name]));
   if (sig !== projSig) {
     $("projList").innerHTML = show.length
-      ? show.map(p => `<button type="button" class="proj" data-path="${esc(p.path)}" title="Open ${esc(home(p.path))} in VS Code">${ph("folder", "ic")}<span>${esc(p.name)}</span></button>`).join("")
+      ? show.map(p => `<div class="proj-row"><button type="button" class="proj" data-path="${esc(p.path)}" title="Open ${esc(home(p.path))} in a session, in Focus">${ph("folder", "ic")}<span>${esc(p.name)}</span></button>${codeBtn(p)}</div>`).join("")
       : `<span class="dim">no git repos in ${esc(cfg.dir)}</span>`;
     projSig = sig;
   }
@@ -932,12 +1076,29 @@ function renderMenu() {
   const hits = projMatch(q.value, S.projects || []).slice(0, 12);
   projSel = Math.max(0, Math.min(projSel, hits.length - 1));
   m.innerHTML = hits.length
-    ? hits.map((p, i) => `<div class="proj-opt${i === projSel ? " on" : ""}" role="option" aria-selected="${i === projSel}" data-path="${esc(p.path)}"><span class="n">${esc(p.name)}</span><span class="r">${esc(p.rel)}</span></div>`).join("")
+    ? hits.map((p, i) => `<div class="proj-opt${i === projSel ? " on" : ""}" role="option" aria-selected="${i === projSel}" data-path="${esc(p.path)}"><span class="n">${esc(p.name)}</span><span class="r">${esc(p.rel)}</span>${codeBtn(p, ' tabindex="-1"')}</div>`).join("")
     : `<div class="proj-none">No match</div>`;
   m.hidden = false;
   m._hits = hits;
 }
 
+async function openSession(path) {
+  try {
+    const r = await api("/api/session/new", { cwd: path, mode: "bypassPermissions", reuse: true });
+    flash = [r.msg, Date.now()];
+    renderHint();
+    // its row only appears once claude has written its session file
+    for (let i = 0; i < 60 && !S.sessions.some(x => x.sid === r.sid); i++) {
+      await poll(true);
+      await new Promise(done => setTimeout(done, 250));
+    }
+    sel = r.sid;
+    setTab("focus");
+  } catch (e) {
+    flash = [`could not start a session: ${e.message}`, Date.now()];
+    renderHint();
+  }
+}
 async function openProject(path) {
   try { flash = [(await api("/api/open", { path })).msg, Date.now()]; }
   catch (e) { flash = [`could not open the project: ${e.message}`, Date.now()]; }
@@ -1251,6 +1412,7 @@ function render() {
     const html = tableHTML(rows);
     if ($("table")._html !== html) { $("table").innerHTML = html; $("table")._html = html; }
   }
+  fxTermSync();
   $("note").textContent = `ctx = last request input · window ${S.cfg.window ? "$CLAUDE_CTX_WINDOW" : "200k, 1M if peak>200k"}`;
   $("usage").innerHTML = usageHTML(S.usage);
   renderProjects();
@@ -1279,10 +1441,11 @@ function render() {
 function hintKeys() {
   return chatOn()
     ? "enter send · esc close chat · ctrl-u clear line · /clear new chat"
-    : document.activeElement === $("projQ") ? "type to filter · ↑↓ select · enter open in VS Code · esc close"
+    : document.activeElement === $("projQ") ? "type to filter · ↑↓ select · enter open in Focus · esc close"
     : document.activeElement?.closest?.("#tkForm") ? "enter saves (⌘/ctrl-enter in the description) · esc cancels"
     : document.activeElement === $("tkNote") ? "enter saves the note · esc leaves"
     : document.activeElement?.classList?.contains("tx-input") ? "enter send · esc leave · ctrl-u clear line"
+    : document.activeElement?.closest?.("#fxTerm") ? "keys go to the shell · shift-esc leave"
     : document.activeElement === $("fxEd") ? "⌘/ctrl-S save · tab indent · shift-tab outdent · esc leave"
     : tab === "focus" ? `1 sessions · 2 tasks · 3 transcripts · ←→ switch session · n new session · enter type · f focus terminal · a ${showAll ? "hide ended" : "show ended"} · / chat · r refresh`
     : tab === "tx" ? `1 sessions · 2 tasks · 4 focus · ←↑↓→ select · enter type · n new session · s size · shift+←→ move · f focus · a ${showAll ? "hide ended" : "show ended"} · / chat · r refresh`
@@ -1401,7 +1564,7 @@ async function send(text) {
 function move(key) {
   const rows = S?.sessions || [];
   if (!rows.length) return;
-  const ids = tab === "tx" ? [...$("txs").children].map(el => el.dataset.sid) : rows.map(r => r.sid);
+  const ids = tab === "tx" || tab === "focus" ? [...$("txs").children].map(el => el.dataset.sid) : rows.map(r => r.sid);
   let cur = ids.indexOf(sel);
   let per = 1;
   if (tab === "tx" || (tab !== "focus" && view === "tiles")) {
@@ -1512,7 +1675,7 @@ function pick(e) {
 }
 $("projList").addEventListener("click", e => {
   const el = e.target.closest("[data-path]");
-  if (el) openProject(el.dataset.path);
+  if (el) ("code" in el.dataset ? openProject : openSession)(el.dataset.path);
 });
 const projQ = $("projQ");
 projQ.addEventListener("input", () => { projSel = 0; renderMenu(); });
@@ -1521,14 +1684,14 @@ projQ.addEventListener("blur", () => { projQ.value = ""; renderMenu(); renderHin
 projQ.addEventListener("keydown", e => {
   const hits = $("projMenu")._hits || [];
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); projSel += e.key === "ArrowDown" ? 1 : -1; renderMenu(); }
-  else if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); const p = hits[projSel]; projQ.blur(); if (p) openProject(p.path); }
+  else if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); const p = hits[projSel]; projQ.blur(); if (p) openSession(p.path); }
   else if (e.key === "Escape") { e.preventDefault(); projQ.blur(); }
   else if (e.ctrlKey && (e.key === "u" || e.key === "U")) { e.preventDefault(); projQ.value = ""; projSel = 0; renderMenu(); }
 });
 $("projMenu").addEventListener("mousedown", e => {
   e.preventDefault();
   const el = e.target.closest("[data-path]");
-  if (el) { projQ.blur(); openProject(el.dataset.path); }
+  if (el) { projQ.blur(); (e.target.closest("[data-code]") ? openProject : openSession)(el.dataset.path); }
 });
 dirIn.addEventListener("input", () => { dirErr = ""; });
 dirIn.addEventListener("keydown", e => {
@@ -1614,7 +1777,10 @@ $("txs").addEventListener("keydown", e => {
 $("txs").addEventListener("focusin", e => { const b = e.target.closest(".txbox"); if (b) { sel = b.dataset.sid; render(); } });
 $("txs").addEventListener("focusout", () => setTimeout(render));
 $("fxSel").addEventListener("change", e => { sel = e.target.value; e.target.blur(); render(); });
-$("fxCode").addEventListener("click", e => { const f = e.target.closest(".fx-file"); if (f && fxSid) fxOpen(fxSid, f.dataset.path); });
+// no focus on click: space and enter must keep their page shortcuts
+$("fxNav").addEventListener("mousedown", e => e.preventDefault());
+$("fxNav").addEventListener("click", e => { const b = e.target.closest("[data-key]"); if (b) move(b.dataset.key); });
+$("fxCode").addEventListener("click", e => { const f = e.target.closest(".fx-file"); if (f && fxSid) { fxModeSet("editor"); fxOpen(fxSid, f.dataset.path); } });
 // enter and space belong to the file or folder under focus, not to the page's shortcuts
 $("fxCode").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); });
 // pct is the chat's share of the chat + editor width; the two columns always add up to the 4fr they started with
@@ -1640,6 +1806,17 @@ $("fxSplit").addEventListener("keydown", e => {
   fxSplitSet(Number($("fxSplit").getAttribute("aria-valuenow")) + (e.key === "ArrowLeft" ? -5 : 5));
 });
 $("fxEdSave").addEventListener("click", () => fxSave());
+// no focus on click: the arrows must keep switching session
+$("fxFilesBtn").addEventListener("mousedown", e => e.preventDefault());
+$("fxFilesBtn").addEventListener("click", () => fxFilesSet($("txView").classList.contains("fx-nofiles")));
+// enter and space belong to the button, not to the page's shortcuts
+$("fxFilesBtn").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); });
+fxFilesSet(store.get("cs.fxfiles") !== "0");
+$("fxMode").addEventListener("change", e => { e.target.blur(); fxModeSet(e.target.value); });
+$("theme-css").addEventListener("load", () => { if (!fxTerm) return; Object.assign(fxTerm.options, fxTermStyle()); if ($("fxTerm").offsetWidth) fxFit.fit(); });
+fxModeSet(fxMode);
+$("fxTerm").addEventListener("focusin", renderHint);
+$("fxTerm").addEventListener("focusout", renderHint);
 $("fxGitBar").addEventListener("submit", e => { e.preventDefault(); fxGitRun("commit"); });
 $("fxGitBar").addEventListener("click", e => { const b = e.target.closest("[data-git]"); if (b) fxGitRun(b.dataset.git); });
 $("fxEd").addEventListener("input", () => { fxEdShow(); fxEdPaint(); });

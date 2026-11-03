@@ -131,7 +131,8 @@ a { color: var(--orange); }
 }
 .proj span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .proj .ic { width: 14px; height: 14px; color: var(--dim); }
-.proj:hover { background: var(--hover); }
+.proj-row { padding-right: 4px; border-radius: var(--r-ctl); }
+.proj-row:hover { background: var(--hover); }
 .proj-menu { position: absolute; left: 0; top: calc(100% + 4px); width: 340px; max-height: 60dvh; overflow: auto; z-index: 5; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-box); box-shadow: 0 8px 28px rgb(20 20 40 / .22); }
 .proj-opt { display: flex; justify-content: space-between; gap: 16px; padding: 4px 8px; border-radius: var(--r-ctl); white-space: nowrap; }
 .proj-opt .n { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
