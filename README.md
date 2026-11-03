@@ -57,7 +57,7 @@ on disk, saving asks before overwriting.
 prompts sent to the dashboard (`--permission-prompt-tool stdio`). Start one with `New Session` in the
 web toolbar or `n` (folder, permission mode, optional first message), or `n` in the TUI (pick the
 folder in the projects search). Task sessions can run this way too: pick `This dashboard` under
-`Task sessions open in` in Settings, and Analyze starts the session in plan mode inside cs.
+`Task sessions open in` in Settings, and Analyze starts the session inside cs.
 
 When Claude asks to use a tool, or posts a plan, the box shows it with `allow`/`approve` and `deny`
 (`y` and `d` in the TUI). Typing a reply instead denies it with your message, which is how you comment
@@ -204,19 +204,25 @@ Tasks live in `~/.claude/state/cs-tasks.db` (SQLite, or `$CS_TASKS_DB`).
 ### Working a task with Claude
 
 `analyze` in a task's detail opens a new terminal tab or window running an interactive `claude` session in the
-task's repo, in plan mode, with the task (and its email, marked as third-party data) as the first prompt.
+task's repo, with the task (and its email, marked as third-party data) as the first prompt. The select next to
+the button sets the permission mode, for `resume session` too. It defaults to `Skip all permissions`
+(`bypassPermissions`), so nothing stops the session from running any command, including on a task built from
+an email: pick `Plan first` for read-only analysis enforced by Claude Code.
 It shows up in the sessions view like any other session, its tile tagged `task #N`, and `focus session`
 brings its tab forward. The task follows the session by reading its transcript:
 
 | Status       | When                                                                                     |
 |--------------|------------------------------------------------------------------------------------------|
-| analyzing    | the session is investigating, read-only                                                  |
+| analyzing    | the session is investigating; it is told to change nothing, enforced only in `Plan first` |
 | to approve   | Claude posted its plan (findings, for a check): approve or comment in its tab            |
 | implementing | you approved: it creates a worktree on `task/<id>-<slug>`, implements, tests and commits |
 | to review    | it ended its report with `[task #N ready for review]`                                    |
 | failed       | the session ended before posting a plan                                                  |
 
-Rejecting or commenting on the plan sends the task back to analyzing until the next plan. The detail shows
+Without plan mode Claude has no `ExitPlanMode`, so it ends the plan with `[task #N plan ready]` and waits. Any
+reply then moves the task to implementing, and a revised plan moves it back to to approve.
+
+In `Plan first`, rejecting or commenting on the plan sends the task back to analyzing until the next plan. The detail shows
 the plan, the final report, and the branch's worktree, commits and diff stat; `open in VS Code` opens the
 worktree once it exists. Nothing is pushed, merged or deployed and no email is sent: you review the branch
 and merge it yourself, then mark the task done. `resume session` reopens an ended session in the chosen terminal;

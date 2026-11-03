@@ -500,6 +500,7 @@ dialog.sheet { border-radius: var(--r-box); background: var(--surface); border: 
 .tx-size button { width: 22px; height: 22px; }
 .tx-size button[aria-pressed=true] { color: var(--orange); border-color: transparent; }
 .tx-mode { max-width: 118px; }
+.tk-mode { max-width: none; }
 .md code { font-size: .92em; }
 .msg.you code { background: rgb(255 255 255 / .2); }
 .md a { color: var(--orange); }

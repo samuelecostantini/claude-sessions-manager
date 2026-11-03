@@ -1108,12 +1108,16 @@ function renderDetail() {
   $("tkDismiss").hidden = !(t.source === "email" && isOpen(t));
 }
 
+let tkPerm = "bypassPermissions";
+const tkModeHTML = () => `<select class="tx-mode tk-mode" aria-label="Session permission mode" title="permission mode">`
+  + $("txNew").elements.mode.innerHTML.replace(`value="${tkPerm}"`, `value="${tkPerm}" selected`) + `</select>`;
+
 function sessHTML(t, sess) {
   let line, acts;
   if (!t.session_id) {
-    line = t.repo ? `No Claude session yet. Analyze opens one in ${esc(S.cfg.terminal?.app || "Terminal")}, in plan mode, in ${esc(home(t.repo))}.`
+    line = t.repo ? `No Claude session yet. Analyze opens one in ${esc(S.cfg.terminal?.app || "Terminal")}, in ${esc(home(t.repo))}.`
       : `Set the task's repo (edit, then pick client/repo) to analyze it.`;
-    acts = `<button type="button" class="tk-btn primary" data-act="analyze"${t.repo ? "" : " disabled"}>Analyze</button>`;
+    acts = tkModeHTML() + `<button type="button" class="tk-btn primary" data-act="analyze"${t.repo ? "" : " disabled"}>Analyze</button>`;
   } else if (sess) {
     const busy = sess.status === "busy";
     line = busy ? `<span class="o"><span data-spin="0">${SPIN[FRAME % 10]}</span> session ${esc(t.session_id.slice(0, 8))} is working</span>${sess.act ? ` <span class="dim">· ${esc(one(sess.act))}</span>` : ""}`
@@ -1125,7 +1129,7 @@ function sessHTML(t, sess) {
     acts = "";
   } else {
     line = `<span class="dim">session ${esc(t.session_id.slice(0, 8))} has ended</span>`;
-    acts = `<button type="button" class="tk-btn primary" data-act="resume">Resume Session</button>`
+    acts = tkModeHTML() + `<button type="button" class="tk-btn primary" data-act="resume">Resume Session</button>`
       + `<button type="button" class="tk-btn" data-act="again">Analyze Again</button>`;
   }
   return `<div class="tk-sess"><div class="tk-sess-line">${line}</div>${acts ? `<div class="tk-acts">${acts}</div>` : ""}</div>`;
@@ -1135,7 +1139,7 @@ async function taskSession(resume) {
   const t = tkCur;
   if (!t) return;
   try {
-    tkCur = await api("/api/task/session", { id: t.id, resume });
+    tkCur = await api("/api/task/session", { id: t.id, resume, mode: tkPerm });
     const app = S.cfg.terminal?.app || "Terminal";
     flash = [resume ? `resumed #${t.id}'s session in ${app}` : `#${t.id}: Claude is analyzing it in ${app}`, Date.now()];
   } catch (e) {
@@ -1641,6 +1645,7 @@ $("tkList").addEventListener("click", e => {
   const el = e.target.closest("[data-tid]");
   if (el) selectTask(Number(el.dataset.tid) === tkSel ? null : Number(el.dataset.tid));
 });
+$("tkDetail").addEventListener("change", e => { if (e.target.matches(".tk-mode")) tkPerm = e.target.value; });
 $("tkDetail").addEventListener("click", e => {
   if (e.target.closest("[data-act=close]")) { selectTask(null); return; }
   const act = e.target.closest("[data-act]")?.dataset.act;
