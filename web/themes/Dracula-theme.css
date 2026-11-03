@@ -545,7 +545,7 @@ kbd { font: inherit; color: var(--fg); }
 .fx-tree details > details, .fx-tree details > .fx-file { margin-left: 12px; }
 .fx-tree summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fx-file, .fx-st { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
-.fx-file { color: var(--dim); padding-left: 12px; }
+.fx-file { color: var(--dim); padding-left: 14px; }
 .fx-kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; margin: 0; }
 .fx-kv dt { color: var(--dim); }
 .fx-kv dd { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -553,10 +553,6 @@ kbd { font: inherit; color: var(--fg); }
 .fx-file:hover, .fx-file:focus-visible { color: var(--fg); outline: 0; }
 .fx-ed { position: relative; }
 /* inside the editor's left edge: a pane can clip with overflow: hidden, so it can't sit in the gap */
-.fx-split { position: absolute; z-index: 1; top: 0; bottom: 0; left: 0; width: 8px; cursor: col-resize; touch-action: none; }
-.fx-split::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 2px; border-radius: 1px; background: var(--orange); opacity: 0; transition: opacity .15s; }
-.fx-split:hover::after, .fx-split:focus-visible::after { opacity: 1; }
-.fx-split:focus-visible { outline: 0; }
 .fx-ed .chat-head { align-items: center; }
 .fx-ed .chat-side { flex: 1; min-width: 0; }
 .fx-ed .chat-head button { flex: none; padding: 0 8px; pointer-events: auto; }
