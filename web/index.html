@@ -44,7 +44,13 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
 .fx-tree details[open] > summary::before { transform: rotate(90deg); }
 /* sits in the file's left padding, under the folder chevrons, so file and folder names stay aligned */
 .fx-tree .fx-file::before { content: ""; display: inline-block; width: 12px; height: 12px; margin: 0 2px 0 -14px; vertical-align: -1px; background: currentColor; opacity: .7; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 1.75h5.25L12.75 5.25V14.25H4zM9.25 1.75V5.25H12.75' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; }
-@media (prefers-reduced-motion: reduce) { .fx-split::before, .fx-split::after, .fx-tree summary::before { transition: none; } }
+.txbox .chat-log { scrollbar-width: none; }
+.txbox .chat-log::-webkit-scrollbar { display: none; }
+/* the negative margin floats it over the end of the log without taking up space */
+.tx-down { flex: none; align-self: center; position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; margin: -36px 0 8px; padding: 0; color: var(--fg); background: var(--surface, var(--bg)); border: 1px solid var(--gray); border-radius: 50%; box-shadow: 0 2px 6px rgb(0 0 0 / .25); transition: color .15s, border-color .15s; }
+.tx-down[hidden] { display: none; }
+.tx-down:hover, .tx-down:focus-visible { color: var(--orange); border-color: var(--orange); outline: 0; }
+@media (prefers-reduced-motion: reduce) { .tx-down { transition: none; } .fx-split::before, .fx-split::after, .fx-tree summary::before { transition: none; } }
 </style>
 <link id="theme-css" rel="stylesheet" href="__CS_THEME__">
 </head>
@@ -215,9 +221,11 @@ const ICONS = {
   sidebar: "M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM40,56H80V200H40ZM216,200H96V56H216V200Z",
   rows: "M208,136H48a16,16,0,0,0-16,16v40a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,56H48V152H208v40Zm0-144H48A16,16,0,0,0,32,64v40a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V64A16,16,0,0,0,208,48Zm0,56H48V64H208v40Z",
   folder: "M216,72H130.67L102.93,51.2a16.12,16.12,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V200a16,16,0,0,0,16,16H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V64H93.33L123.2,86.4A8,8,0,0,0,128,88h88Z",
+  down: "M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z",
   chat: "M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z",
 };
 const ph = (name, cls = "") => `<svg class="${cls}" viewBox="0 0 256 256" width="16" height="16" aria-hidden="true"><path style="fill:currentColor;stroke:none" d="${ICONS[name]}"/></svg>`;
+const txDownSync = lg => { lg.nextElementSibling.hidden = lg.scrollHeight - lg.scrollTop - lg.clientHeight <= 8; };
 const FX_ICON = ph("corners"), CHAT_ICON = ph("chat");
 document.querySelectorAll("[data-ic]").forEach(el => el.insertAdjacentHTML("afterbegin", ph(el.dataset.ic, "ic")));
 // a 2×2 grid with the cells the size covers filled in; full width is one bar across the top (both rows for full2)
@@ -506,7 +514,7 @@ function renderTx() {
     if (!el) {
       el = document.createElement("article");
       el.dataset.sid = r.sid;
-      el.innerHTML = `<div class="chat-head" draggable="true"><span class="chat-title"></span><span class="chat-side"></span></div><div class="chat-log"></div>`
+      el.innerHTML = `<div class="chat-head" draggable="true"><span class="chat-title"></span><span class="chat-side"></span></div><div class="chat-log"></div><button type="button" class="tx-down" data-act="down" title="Go to the latest message" aria-label="Go to the latest message" hidden>${ph("down")}</button>`
         + `<div class="tx-ask" hidden></div>`
         + `<div class="chat-field"><span class="p">❯</span><input class="tx-input" autocomplete="off" spellcheck="false">`
         + `<span class="tx-size" role="group" aria-label="Box size"><span class="tx-size-pop">${TX_SIZES.map(z => `<button type="button" data-size="${z}" title="${txSizeName(z)}" aria-label="size ${txSizeName(z)}">${txIcon(z)}</button>`).join("")}</span></span>`
@@ -556,6 +564,7 @@ function renderTx() {
     const want = prev ? prev.nextElementSibling : box.firstElementChild;
     if (el !== want) box.insertBefore(el, want);
     if (!lg._up) lg.scrollTop = lg.scrollHeight;
+    txDownSync(lg);
     prev = el;
   }
   for (const el of old.values()) el.remove();
@@ -1547,6 +1556,7 @@ $("txs").addEventListener("click", e => {
   else if (act === "fx") setTab("focus");
   else if (act === "allow" || act === "deny") txAct("/api/session/answer", { sid: sel, allow: act === "allow" });
   else if (act === "stop") txAct("/api/session/stop", { sid: sel });
+  else if (act === "down") { el.querySelector(".chat-log")._up = false; render(); }
   else render();
 });
 $("txs").addEventListener("dragstart", e => {
@@ -1587,7 +1597,9 @@ $("txNew").addEventListener("submit", async e => {
 for (const t of ["wheel", "touchmove", "pointerdown"]) $("txs").addEventListener(t, e => { const lg = e.target.closest?.(".chat-log"); if (lg) lg._userT = Date.now(); }, { capture: true, passive: true });
 $("txs").addEventListener("scroll", e => {
   const lg = e.target;
-  if (lg.classList?.contains("chat-log") && Date.now() - (lg._userT || 0) < 1000) lg._up = lg.scrollHeight - lg.scrollTop - lg.clientHeight > 8;
+  if (!lg.classList?.contains("chat-log")) return;
+  if (Date.now() - (lg._userT || 0) < 1000) lg._up = lg.scrollHeight - lg.scrollTop - lg.clientHeight > 8;
+  txDownSync(lg);
 }, true);
 addEventListener("resize", () => { if (tab === "tx") render(); });
 $("txs").addEventListener("keydown", e => {
