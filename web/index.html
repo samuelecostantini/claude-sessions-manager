@@ -73,6 +73,11 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
 /* the negative margin floats it over the end of the log without taking up space */
 .tx-down { flex: none; align-self: center; position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; margin: -36px 0 8px; padding: 0; color: var(--fg); background: var(--surface, var(--bg)); border: 1px solid var(--gray); border-radius: 50%; box-shadow: 0 2px 6px rgb(0 0 0 / .25); transition: color .15s, border-color .15s; }
 .tx-down[hidden] { display: none; }
+.fx-shown { flex: none; display: flex; gap: 4px; padding: 6px 8px; overflow-x: auto; }
+.fx-shown[hidden] { display: none; }
+.fx-shown button { flex: none; padding: 2px 8px; color: var(--dim); font: inherit; font-size: .9em; background: none; border: 1px solid var(--gray); border-radius: 4px; cursor: pointer; }
+.fx-shown button:hover, .fx-shown button:focus-visible { color: var(--fg); outline: 0; }
+.fx-shown button[aria-current] { color: var(--fg); border-color: var(--orange); }
 .tx-down:hover, .tx-down:focus-visible { color: var(--orange); border-color: var(--orange); outline: 0; }
 .fx-nav { margin-left: auto; display: flex; align-items: center; gap: 4px; }
 .fx-nav .tk-btn { display: grid; place-items: center; width: 28px; height: 24px; padding: 0; }
@@ -112,7 +117,7 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
       <aside class="chat fx-pane fx-files fx-only" aria-label="Codebase"><div class="chat-head"><span class="chat-title">Files</span><span class="chat-side" id="fxCodeSide"></span><button type="button" class="tk-btn fx-files-btn" id="fxFilesBtn" data-ic="sidebar" aria-controls="fxCode"></button></div><div class="chat-log fx-tree" id="fxCode"></div></aside>
       <div class="txs" id="txs"></div>
       <div class="fx-split fx-only" id="fxSplit" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize chat and editor" aria-valuemin="20" aria-valuemax="80" title="Drag to resize the chat and the editor"></div>
-      <aside class="chat fx-pane fx-ed fx-only" aria-label="Editor or terminal"><div class="chat-head"><div class="fx-switch" id="fxMode" role="radiogroup" aria-label="Section type"><label><input type="radio" name="fxmode" value="editor">Editor</label><label><input type="radio" name="fxmode" value="terminal">Terminal</label></div><span class="chat-side" id="fxEdPath"></span><button type="button" class="tk-btn" id="fxEdSave" title="Save (⌘/ctrl-S)" disabled>Save</button></div><div class="fx-editor" id="fxEdWrap"><pre class="fx-nums" id="fxEdNums" aria-hidden="true"></pre><div class="fx-edmain"><div class="fx-curline" id="fxEdLine" hidden></div><pre class="fx-hl" id="fxEdHl" aria-hidden="true"></pre><textarea id="fxEd" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File contents" placeholder="Click a file to open it here" readonly></textarea></div></div><div class="fx-term" id="fxTerm" hidden></div></aside>
+      <aside class="chat fx-pane fx-ed fx-only" aria-label="Editor or terminal"><div class="chat-head"><div class="fx-switch" id="fxMode" role="radiogroup" aria-label="Section type"><label><input type="radio" name="fxmode" value="editor">Editor</label><label><input type="radio" name="fxmode" value="terminal">Terminal</label></div><span class="chat-side" id="fxEdPath"></span><button type="button" class="tk-btn" id="fxEdSave" title="Save (⌘/ctrl-S)" disabled>Save</button></div><nav class="fx-shown" id="fxShown" aria-label="Files Claude showed" hidden></nav><div class="fx-editor" id="fxEdWrap"><pre class="fx-nums" id="fxEdNums" aria-hidden="true"></pre><div class="fx-edmain"><div class="fx-curline" id="fxEdLine" hidden></div><pre class="fx-hl" id="fxEdHl" aria-hidden="true"></pre><textarea id="fxEd" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File contents" placeholder="Click a file to open it here" readonly></textarea></div></div><div class="fx-term" id="fxTerm" hidden></div></aside>
       <div class="fx-right fx-only">
         <aside class="chat fx-pane" aria-label="Git status"><div class="chat-head"><span class="chat-title">Git Status</span></div><form class="fx-git" id="fxGitBar" hidden><input name="msg" placeholder="Commit message" aria-label="Commit message" spellcheck="false" autocomplete="off"><button type="button" class="tk-btn" data-git="message" title="Write the message with Claude, from what commit would take: it reads the diff">Generate</button><button type="submit" class="tk-btn" title="Commit what is staged, or every change if nothing is staged">Commit</button><button type="button" class="tk-btn" data-git="push">Push</button><button type="button" class="tk-btn" data-git="fetch">Fetch</button><div class="fx-git-out" id="fxGitOut" role="status"></div></form><div class="chat-log" id="fxGit"></div></aside>
         <aside class="chat fx-pane" aria-label="Session information"><div class="chat-head"><span class="chat-title">Session</span></div><div class="chat-log" id="fxInfo"></div></aside>
@@ -634,8 +639,26 @@ function fxEdShow() {
   const dirty = fxDirty(), other = fxEdit && fxEdit.sid !== fxSid;
   $("fxEdPath").textContent = fxEdit ? `${dirty ? "● " : ""}${other ? "other session: " : ""}${fxEdit.path}` : "";
   $("fxEdPath").title = fxEdit ? fxEdit.path : "";
+  fxShownPaint();
   $("fxEdSave").disabled = !dirty;
   $("fxEd").readOnly = !fxEdit;
+}
+
+function fxShownPaint() {
+  const el = $("fxShown"), files = S?.sessions.find(x => x.sid === fxSid)?.tx?.shown?.files ?? [];
+  el.hidden = fxMode === "terminal" || files.length < 2;
+  const html = files.map(f => `<button type="button" data-path="${esc(f)}" title="${esc(f)}"${fxEdit?.sid === fxSid && fxEdit.path === f ? ` aria-current="true"` : ""}>${esc(f.split("/").pop())}</button>`).join("");
+  if (el._html !== html) { el.innerHTML = html; el._html = html; }
+}
+
+// Claude's show_files: opens once per call, even across reloads; unsaved text is never replaced, the call waits for it
+function fxShownOpen(r) {
+  const s = r.tx.shown, key = `cs.shown.${r.sid}`;
+  if (!s || store.get(key) === s.id || fxDirty()) return;
+  store.set(key, s.id);
+  // the terminal keeps its keystrokes: the file still loads, behind it
+  if (!$("fxTerm").contains(document.activeElement)) fxModeSet("editor");
+  fxOpen(r.sid, s.files[0]);
 }
 
 function fxEdSet(edit, text) {
@@ -831,6 +854,7 @@ function fxModeSet(m) {
   const on = m === "terminal";
   $("fxEdWrap").hidden = $("fxEdPath").hidden = $("fxEdSave").hidden = on;
   $("fxTerm").hidden = !on;
+  fxShownPaint();
   fxTermSync();
   if (on) fxTerm?.focus();
 }
@@ -942,6 +966,8 @@ function renderFocus(rows) {
     if (!fxDirty()) { fxReq++; fxEdSet(null, ""); }
     fxEdShow();
   }
+  fxShownOpen(r);
+  fxShownPaint();
   if (Date.now() - fxT > 5000) fxLoad(r.sid);
   $("fxCodeSide").textContent = home(r.cwd);
   const code = $("fxCode"), sig = fxData && JSON.stringify([fxData.files, fxData.more, fxData.err]);
@@ -1781,6 +1807,7 @@ $("fxSel").addEventListener("change", e => { sel = e.target.value; e.target.blur
 $("fxNav").addEventListener("mousedown", e => e.preventDefault());
 $("fxNav").addEventListener("click", e => { const b = e.target.closest("[data-key]"); if (b) move(b.dataset.key); });
 $("fxCode").addEventListener("click", e => { const f = e.target.closest(".fx-file"); if (f && fxSid) { fxModeSet("editor"); fxOpen(fxSid, f.dataset.path); } });
+$("fxShown").addEventListener("click", e => { const b = e.target.closest("button"); if (b && fxSid) fxOpen(fxSid, b.dataset.path); });
 // enter and space belong to the file or folder under focus, not to the page's shortcuts
 $("fxCode").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); });
 // pct is the chat's share of the chat + editor width; the two columns always add up to the 4fr they started with

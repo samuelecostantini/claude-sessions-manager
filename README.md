@@ -40,6 +40,10 @@ the left (`git ls-files` from the session's folder, ignored files left out), its
 then an editor, `git status` on the right, and the session's information below that. Pick the session in the
 menu above, or with `←`/`→`. The panes refresh every 5s. The box works as in transcripts. Drag the editor's left edge to share the width between chat and editor, or focus it with Tab and use `←`/`→`; the split is remembered.
 
+Sessions started from cs can show you files: their Claude has a `show_files` tool that opens files in this editor, the first one
+at once and the rest as tabs above it. It never replaces unsaved text and doesn't take over a terminal you are typing in. For sessions
+started elsewhere, add it with `claude mcp add -s user cs -- ~/.claude/scripts/claude-sessions --mcp`.
+
 The git status pane has `commit`, `push` and `fetch` buttons, run in the session's folder. `commit` takes what is staged, or
 every change including untracked files if nothing is staged. `push` asks first, and sets the upstream on a new branch.
 `generate` fills in the message with a headless `claude -p` (`$CS_CHAT_MODEL`), for you to edit before committing. It sees the
