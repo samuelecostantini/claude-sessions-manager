@@ -1757,12 +1757,21 @@ def chat_view(cols):
         out += [row(x) for x in log[-CHAT_ROWS:]] + [f"{bd}├{'─' * (W - 2)}┤{Z}"]
     return out + [row(field), f"{bd}╰{'─' * (W - 2)}╯{Z}"]
 
-import fcntl, select, struct, termios
+import fcntl, select, struct, termios, atexit, shutil, tempfile
 # the Focus view's terminals, one shell per folder; they outlive the page, and end with this process (closing the master hangs them up)
 PTYS, PTYS_LOCK, PTY_KEEP = {}, threading.Lock(), 1 << 18
 # python ignores these signals and exec keeps that; setsid alone gives no controlling tty on macOS, and ctrl-c needs one
 PTY_EXEC = ("import fcntl, os, signal, sys, termios; signal.signal(signal.SIGPIPE, signal.SIG_DFL); signal.signal(signal.SIGXFSZ, signal.SIG_DFL); "
             "fcntl.ioctl(0, termios.TIOCSCTTY, 0); os.execv(sys.argv[1], sys.argv[1:])")
+
+# zsh reads this first: it puts ZDOTDIR back so the user's files load as usual, and only a precmd hook runs late enough to outlast them
+PTY_ZSHENV = r"""
+if [[ -n $CS_ZDOTDIR ]]; then ZDOTDIR=$CS_ZDOTDIR; else unset ZDOTDIR; fi
+unset CS_ZDOTDIR
+[[ -f ${ZDOTDIR:-$HOME}/.zshenv ]] && source ${ZDOTDIR:-$HOME}/.zshenv
+_cs_prompt() { PROMPT='%1~ %# '; precmd_functions=(${precmd_functions:#_cs_prompt}); unfunction _cs_prompt }
+precmd_functions+=(_cs_prompt)
+"""
 
 def pty_size(p, cols, rows):
     fcntl.ioctl(p["fd"], termios.TIOCSWINSZ, struct.pack("HHHH", max(1, min(rows, 1000)), max(1, min(cols, 1000)), 0, 0))
@@ -1782,6 +1791,11 @@ def pty_open(cwd, cols, rows):
             env = {"LANG": "en_US.UTF-8", **os.environ, "TERM": "xterm-256color", "COLORTERM": "truecolor"}
             # these belong to the tab that started cs: with them zsh would restore and overwrite that tab's saved session
             for k in ("TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TERM_SESSION_ID", "ITERM_SESSION_ID"): env.pop(k, None)
+            # shortcut: zsh only, other shells keep their own prompt; add theirs if someone uses one
+            if os.path.basename(sh) == "zsh":
+                env["CS_ZDOTDIR"], env["ZDOTDIR"] = env.get("ZDOTDIR", ""), tempfile.mkdtemp(prefix="cs-zsh-")
+                atexit.register(shutil.rmtree, env["ZDOTDIR"], True)
+                with open(f"{env['ZDOTDIR']}/.zshenv", "w") as f: f.write(PTY_ZSHENV)
             p["proc"] = subprocess.Popen([sys.executable, "-Ic", PTY_EXEC, sh, "-l"], cwd=cwd, env=env, stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
         except BaseException:
             os.close(fd)

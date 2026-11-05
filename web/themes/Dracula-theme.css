@@ -250,7 +250,7 @@ kbd { font: inherit; color: var(--fg); }
   background: var(--surface); border: 1px solid var(--line-soft); border-radius: 8px;
   overflow: hidden; transition: border-color .15s;
 }
-.chat.on { border-color: color-mix(in srgb, var(--orange) 70%, transparent); }
+.chat.on:not(.tx-view.fx .chat) { border-color: color-mix(in srgb, var(--orange) 70%, transparent); }
 .chat-head {
   display: flex; justify-content: space-between; gap: 12px; pointer-events: none;
   padding: 6px 12px; background: var(--bg); border-bottom: 1px solid var(--line-soft); font-size: 12px;
@@ -276,7 +276,7 @@ kbd { font: inherit; color: var(--fg); }
   transition: border-color .15s;
 }
 .chat-log[hidden] + .chat-field { margin-top: 10px; }
-.chat.on .chat-field { border-color: var(--orange); }
+.chat.on:not(.tx-view.fx .chat) .chat-field { border-color: var(--orange); }
 .chat-field .p { color: var(--green); font: 600 13px var(--mono); }
 #ask, .tx-input {
   flex: 1; min-width: 0; border: 0; outline: 0; padding: 7px 0;
@@ -481,7 +481,7 @@ kbd { font: inherit; color: var(--fg); }
 .txbox .chat-head { pointer-events: auto; cursor: grab; }
 .txbox.drag { opacity: .5; }
 .txbox .chat-log { flex: 1; min-height: 0; overflow-x: hidden; overflow-wrap: anywhere; overflow-anchor: none; }
-.txbox.sel { border-color: var(--orange); }
+.tx-view:not(.fx) .txbox.sel { border-color: var(--orange); }
 .txbox.s-ended .chat-title { color: var(--dim); }
 .tx-input:disabled { cursor: not-allowed; }
 .txbox .chat-field .tk-btn { flex: none; }

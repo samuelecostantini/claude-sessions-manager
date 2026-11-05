@@ -183,14 +183,14 @@ b, .b { font-weight: 700; }
 .proj-dir:hover, .proj-dir:focus-visible { color: var(--fg); text-decoration: underline; outline: 0; }
 .proj-dir-in { flex: none; width: 30ch; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--orange); border-radius: 4px; padding: 1px 6px; outline: 0; }
 .chat { position: relative; border: 1px solid var(--gray); border-radius: 10px; padding: 14px 16px 8px; margin-top: 12px; cursor: text; transition: border-color .2s; }
-.chat.on { border-color: var(--orange); }
+.chat.on:not(.tx-view.fx .chat) { border-color: var(--orange); }
 .chat-head { position: absolute; top: -.75em; left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 12px; pointer-events: none; }
 .chat-head span { background: var(--bg); padding: 0 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chat-title { color: var(--orange); font-weight: 700; flex: none; }
 .chat-side { color: var(--dim); }
 .chat-log { overflow-y: auto; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--gray); }
 .chat-log[hidden] { display: none; }
-.chat.on .chat-log { border-bottom-color: color-mix(in srgb, var(--orange) 55%, transparent); }
+.chat.on:not(.tx-view.fx .chat) .chat-log { border-bottom-color: color-mix(in srgb, var(--orange) 55%, transparent); }
 .msg { display: grid; grid-template-columns: 2ch minmax(0, 1fr); column-gap: 4px; }
 .msg.you { background: var(--ubg); border-radius: 4px; padding: 1px 6px 1px 4px; margin: 3px 0; }
 .msg.claude .g { color: var(--orange); }
@@ -381,7 +381,7 @@ kbd { font: inherit; color: var(--fg); }
 .txbox .chat-head { pointer-events: auto; cursor: grab; }
 .txbox.drag { opacity: .5; }
 .txbox .chat-log { flex: 1; min-height: 0; overflow-x: hidden; overflow-wrap: anywhere; overflow-anchor: none; }
-.txbox.sel { border-color: var(--orange); }
+.tx-view:not(.fx) .txbox.sel { border-color: var(--orange); }
 .txbox.s-ended .chat-title { color: var(--dim); }
 .tx-input:disabled { cursor: not-allowed; }
 .txbox .chat-field .tk-btn { flex: none; }

@@ -66,4 +66,17 @@ pty_write(root, "exit\n")
 try: pty_open(root + "/nope", 80, 24); raise AssertionError("opened")
 except OSError: pass
 assert root + "/nope" not in PTYS
+
+# zsh: the prompt is only the folder, even over the user's own, and their startup files still load
+home = os.path.realpath(tempfile.mkdtemp())
+os.makedirs(home + "/proj")
+open(home + "/.zshenv", "w").write("export FROM_ENV=1\n")
+open(home + "/.zshrc", "w").write("export FROM_RC=1\nPROMPT='someone@host %1~ %# '\n")
+os.environ.update(SHELL="/bin/zsh", HOME=home)
+z = pty_open(home + "/proj", 100, 30)
+until(z, b"proj % ")
+assert b"someone@host" not in z["buf"]
+pty_write(home + "/proj", 'printf "%s%s %s\\n" ZD OT "${ZDOTDIR-unset} ${CS_ZDOTDIR-unset} $FROM_ENV $FROM_RC"\n')
+until(z, b"ZDOT unset unset 1 1")
+pty_write(home + "/proj", "exit\n")
 print("ok")
