@@ -1,14 +1,21 @@
 # claude-sessions
 
 A full-screen terminal dashboard for your running Claude Code sessions (macOS), also served
-as a web page. Read and reply to every session from one screen in the [transcripts](#transcripts)
+as a web page. [Focus](#focus) gives one session the whole page: its chat next to its files, an editor,
+a real terminal and git. Read and reply to every session from one screen in the [transcripts](#transcripts)
 view, one chat box per session. One tile per session with status, context usage, model, tokens, working directory,
 git branch, current task, the session's subagents and workflows, plus a usage-limit bar, a
 projects bar that opens repos in VS Code, and a chat with a small Claude that acts for you.
 
 ![Demo](assets/demo.gif)
 
-▶ [Watch the demo video](assets/demo.mp4) (23s)
+▶ [Watch the demo video](assets/demo.mp4) (1 min)
+
+![Focus](assets/focus.png)
+
+![Sessions](assets/sessions.png)
+
+Screenshots and the demo use made-up projects and sessions, in the `Native` theme.
 
 ## Transcripts
 
@@ -37,8 +44,10 @@ sizes per session in the browser; the TUI keeps them until it quits. In the web,
 
 The web's `focus` tab (`4`, or the corners icon on a tile or a transcript box) gives one session the whole page: the codebase on
 the left (`git ls-files` from the session's folder, ignored files left out), its chat box next to it,
-then an editor, `git status` on the right, and the session's information below that. Pick the session in the
-menu above, or with `←`/`→`. The panes refresh every 5s. The box works as in transcripts. Drag the editor's left edge to share the width between chat and editor, or focus it with Tab and use `←`/`→`; the split is remembered.
+then an editor, `git status` on the right, and the session's information below that. Switch session with the
+arrows above, with its name between them, or with `←`/`→`. The panes refresh every 5s. The box works as in transcripts. Drag the editor's left edge to share the width between chat and editor, or focus it with Tab and use `←`/`→`; the split is remembered.
+
+![Focus: approving a tool in the chat](assets/focus-permission.png)
 
 Sessions started from cs can show you files: their Claude has a `show_files` tool that opens files in this editor, the first one
 at once and the rest as tabs above it. It never replaces unsaved text and doesn't take over a terminal you are typing in. For sessions
@@ -60,7 +69,9 @@ on disk, saving asks before overwriting.
 The switch in the pane's title flips it between `Editor` and `Terminal`; the choice is remembered, and clicking a file goes back to the
 editor. The terminal is a real shell (`$SHELL -l`, [xterm.js](https://xtermjs.org) vendored in `web/vendor/`) in the session's folder, so sessions
 in the same folder share one. It keeps running while the pane shows something else, and its last 256 KB of output replays when you come back.
-Keys go to the shell: `shift-esc` leaves it. Shells end when you `exit` them or when `cs` quits.
+In zsh the prompt shows only the folder, not the user name. Keys go to the shell: `shift-esc` leaves it. Shells end when you `exit` them or when `cs` quits.
+
+![Focus: the terminal](assets/focus-terminal.png)
 
 ### Sessions run by cs
 
@@ -171,8 +182,14 @@ it is read on every request):
 ```
 
 Each theme is one complete stylesheet in `web/themes/`. To add one, copy a theme file, restyle
-it, and add an entry to `themes`. The page sets some colours inline, so a theme must define the
+it, and add an entry to `themes`. The window layout (sidebar, toolbar, floating composer) is shared, in `web/index.html`. The page sets some colours inline, so a theme must define the
 tokens listed at the top of `Terminal-theme.css`.
+
+![Native theme, dark](assets/theme-native-dark.png)
+
+![Native theme, light](assets/theme-native-light.png)
+
+![Terminal theme](assets/theme-terminal.png)
 
 ![Claude theme](assets/theme-claude.png)
 
