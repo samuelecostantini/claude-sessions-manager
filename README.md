@@ -58,9 +58,10 @@ every change including untracked files if nothing is staged. `push` asks first, 
 `generate` fills in the message with a headless `claude -p` (`$CS_CHAT_MODEL`), for you to edit before committing. It sees the
 diff of what `commit` would take (first 30k characters), the names of new files and the recent commit subjects.
 
-Sessions running in VS Code (the Claude Code extension) get VS Code itself in place of the files, editor, terminal and git panes:
-`cs` starts one `code serve-web` (VS Code for the web, from your `code` command) and shows it next to the chat, opened on the
-session's folder, through cs's own server at `/vscode/`. Starting it accepts the [VS Code Server license](https://aka.ms/vscode-server-license);
+Sessions running in VS Code (the Claude Code extension), and a project whose VS Code icon you click in the sidebar, get VS Code
+itself in place of the transcript and the panes: `cs` starts one `code serve-web` (VS Code for the web, from your `code` command)
+and shows it alone in Focus, opened on that folder, through cs's own server at `/vscode/`. It follows the system's light or dark
+scheme until you pick a theme in it. Starting it accepts the [VS Code Server license](https://aka.ms/vscode-server-license);
 the first start downloads the server and takes a while. It is a separate VS Code from your desktop one: its extensions live in
 `~/.vscode-server`, and settings come along only with Settings Sync. It stops when `cs` quits, its log is `~/.claude/state/cs-vscode.log`.
 

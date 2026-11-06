@@ -59,10 +59,11 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
 .fx-switch label:has(:checked) { color: var(--bg); }
 .fx-switch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
 .fx-ed [hidden] { display: none !important; }
-/* a session in VS Code gets VS Code itself (code serve-web) in place of files, editor, terminal and git */
-.tx-view.fx:not(.fx-vson) .fx-vs, .tx-view.fx.fx-vson .fx-files, .tx-view.fx.fx-vson .fx-ed, .tx-view.fx.fx-vson .fx-right, .fx-vs [hidden] { display: none; }
+/* a session in VS Code, or a project opened from the sidebar, gets VS Code itself (code serve-web) alone: the transcript and the panes are hidden */
+.tx-view.fx:not(.fx-vson) .fx-vs, .tx-view.fx.fx-vson .fx-files, .tx-view.fx.fx-vson .txs, .tx-view.fx.fx-vson .fx-split, .tx-view.fx.fx-vson .fx-ed, .tx-view.fx.fx-vson .fx-right, .fx-vs [hidden] { display: none; }
 .fx-vs iframe { flex: 1; min-height: 0; width: 100%; border: 0; }
-@media (min-width: 901px) { .tx-view.fx.fx-vson:not([hidden]) { grid-template-columns: minmax(0, var(--fx-chat, 2fr)) minmax(0, var(--fx-ed, 3fr)); } .tx-view.fx.fx-vson .fx-split { grid-area: 2 / 2; } }
+.tx-view.fx.fx-vson:not([hidden]) { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 900px) { .tx-view.fx.fx-vson .fx-vs { height: calc(100dvh - 120px); } }
 .fx-term { flex: 1; min-height: 0; padding: 6px 0 0 8px; overflow: hidden; }
 .fx-term .xterm { height: 100%; }
 /* the rows rarely fill the pane exactly: what is left over shows the pane, not xterm's black */
@@ -349,7 +350,7 @@ let tab = ["tasks", "tx", "focus"].includes(store.get("cs.tab")) ? store.get("cs
 let tkShow = store.get("cs.tkshow") === "all" ? "all" : "open";
 let tkSel = null, tkCur = null, tkLoading = null, tkMode = null, tkSig = "", tkInfoSig = "", tkDlSig = "";
 let txSizes = {}, txOrder = [], txDrag = null, txScrollTo = null;
-let fxSid = null, fxT = 0, fxData = null, fxVsT = 0;
+let fxSid = null, fxT = 0, fxData = null, fxVsT = 0, fxVsPath = null, fxVsSel = null;
 let fxEdit = null, fxReq = 0, fxEdLines = 0;
 let fxMode = store.get("cs.fxmode") === "terminal" ? "terminal" : "editor";
 let fxTerm = null, fxFit = null, fxTermCwd = null, fxTermCtl = null, fxTermOut = "", fxTermBusy = false, fxTermOver = false, fxTermT = 0;
@@ -1025,7 +1026,7 @@ async function fxTermStream(r, ctl) {
 
 // the stream runs only while the terminal shows; the shell keeps running without it
 function fxTermSync() {
-  const r = tab === "focus" && fxMode === "terminal" ? S?.sessions.find(x => x.sid === fxSid && x.entry !== "claude-vscode") : null, cwd = r?.cwd ?? null;
+  const r = tab === "focus" && fxMode === "terminal" && !fxVsPath ? S?.sessions.find(x => x.sid === fxSid && x.entry !== "claude-vscode") : null, cwd = r?.cwd ?? null;
   if (cwd === fxTermCwd) return;
   fxTermCtl?.abort();
   fxTermCtl = null;
@@ -1068,16 +1069,17 @@ function fxNameSet(r, rows) {
   };
 }
 
-// VS Code sessions: one shared code serve-web, opened on the session's folder; it can take a while to start the first time
-function fxVsSync(r) {
-  const on = r.entry === "claude-vscode", f = $("fxVs");
-  $("txView").classList.toggle("fx-vson", on);
-  if (!on || f._cwd === r.cwd || Date.now() - fxVsT < 1000) return;
+// VS Code sessions and projects opened from the sidebar: one shared code serve-web, opened on that folder; it can take a while to start the first time
+function fxVsSync(cwd) {
+  const f = $("fxVs");
+  $("txView").classList.toggle("fx-vson", !!cwd);
+  f._want = cwd;
+  if (!cwd || f._cwd === cwd || Date.now() - fxVsT < 1000) return;
   fxVsT = Date.now();
-  $("fxVsSide").textContent = home(r.cwd);
-  api(`/api/vscode?sid=${encodeURIComponent(r.sid)}`).then(d => {
-    if (fxSid !== r.sid) return;
-    if (d.url) { f.src = d.url; f._cwd = r.cwd; f.hidden = false; }
+  $("fxVsSide").textContent = home(cwd);
+  api(`/api/vscode?path=${encodeURIComponent(cwd)}`).then(d => {
+    if (f._want !== cwd) return;
+    if (d.url) { f.src = d.url; f._cwd = cwd; f.hidden = false; }
     $("fxVsMsg").textContent = d.url ? "" : d.err || "starting VS Code…";
     $("fxVsMsg").hidden = !!d.url;
   }).catch(e => { $("fxVsMsg").textContent = `VS Code: ${e.message}`; });
@@ -1089,8 +1091,10 @@ function renderFocus(rows) {
   $("fxNext").disabled = sel === rows.at(-1)?.sid;
   const r = rows.find(x => x.sid === sel);
   fxNameSet(r, rows);
+  // the project's VS Code stays until you move to another session (fxVsSel undefined: take the one shown now)
+  if (fxVsPath) { if (fxVsSel === undefined) fxVsSel = sel; else if (sel !== fxVsSel) fxVsPath = null; }
+  fxVsSync(fxVsPath || (r?.entry === "claude-vscode" ? r.cwd : null));
   if (!r) return;
-  fxVsSync(r);
   if (r.sid !== fxSid) {
     fxSid = r.sid; fxData = null; fxT = 0; $("fxCode")._sig = null; $("fxCode").innerHTML = "";
     // a half-written message must not get committed to the next session's repo
@@ -1258,10 +1262,9 @@ async function openSession(path) {
     renderHint();
   }
 }
-async function openProject(path) {
-  try { flash = [(await api("/api/open", { path })).msg, Date.now()]; }
-  catch (e) { flash = [`could not open the project: ${e.message}`, Date.now()]; }
-  renderHint();
+function openProject(path) {
+  fxVsPath = path; fxVsSel = undefined;
+  setTab("focus");
 }
 
 const isOpen = t => t.status !== "done" && t.status !== "rejected";
@@ -1562,7 +1565,7 @@ function render() {
   $("table").hidden = onT || onX || view !== "table";
   $("tasks").hidden = !onT;
   // the focus view is the transcripts view with side panes: its CSS shows only the selected box
-  $("txView").hidden = !onX || (onF && !rows.length);
+  $("txView").hidden = !onX || (onF && !rows.length && !fxVsPath);
   $("txView").classList.toggle("fx", onF);
   $("note").hidden = onT || onX;
   if (onX) renderTx();

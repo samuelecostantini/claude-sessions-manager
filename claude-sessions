@@ -1882,8 +1882,24 @@ def vscode_proxy(h):
     hdr = [f"{k}: {v}" for k, v in h.headers.items() if ws or k.lower() not in ("connection", "keep-alive")]
     # one request per connection: the reply then ends when VS Code closes it
     if not ws: hdr.append("Connection: close")
+    # the workbench page is read whole: its settings get a default that follows the browser's (the system's) light or dark scheme
+    page = not ws and h.command == "GET" and re.fullmatch(r"/vscode/?(\?.*)?", h.path)
+    if page: hdr = [x for x in hdr if not x.lower().startswith("accept-encoding:")]
     up.sendall((f"{h.command} {h.path} HTTP/1.1\r\n" + "".join(x + "\r\n" for x in hdr) + "\r\n").encode("latin-1"))
     h.close_connection = True
+    if page:
+        import http.client
+        try:
+            r = http.client.HTTPResponse(up); r.begin(); body = r.read()
+            body = body.replace(b'id="vscode-workbench-web-configuration" data-settings="{',
+                b'id="vscode-workbench-web-configuration" data-settings="{&quot;configurationDefaults&quot;:{&quot;window.autoDetectColorScheme&quot;:true},', 1)
+            h.send_response(r.status, r.reason)
+            for k, v in r.getheaders():
+                if k.lower() not in ("content-length", "transfer-encoding", "connection"): h.send_header(k, v)
+            h.send_header("Content-Length", str(len(body))); h.end_headers(); h.wfile.write(body)
+        except (OSError, http.client.HTTPException): pass
+        finally: up.close()
+        return
     def up_pump():
         try:
             if not ws:
@@ -1991,9 +2007,9 @@ def server(port):
             if not self.allowed(u.path.startswith("/api/")): return
             if u.path == "/vscode" or u.path.startswith("/vscode/"): return vscode_proxy(self)
             if u.path == "/api/vscode":
-                row = row_of((parse_qs(u.query).get("sid") or [""])[0])
-                if not row: return self.reply(404, {"error": "session not found"})
-                url, err = vscode_url(row["cwd"])
+                cwd = (parse_qs(u.query).get("path") or [""])[0]
+                if not os.path.isdir(cwd): return self.reply(404, {"error": "folder not found"})
+                url, err = vscode_url(cwd)
                 return self.reply(200, dict(url=url, err=err))
             if u.path == "/":
                 try: html = open(page, encoding="utf-8").read()
@@ -2116,8 +2132,6 @@ def server(port):
                 if not t: return self.reply(400, {"error": "unknown theme"})
                 if not self.save(theme=t["id"]): return
                 return self.reply(200, {"theme": t["id"]})
-            if u.path == "/api/open":
-                return self.reply(200, {"msg": open_project(str(body.get("path") or ""))})
             if u.path == "/api/settings":
                 d = str(body.get("projects") or "").strip().rstrip("/") or "~/Projects"
                 if not all(os.path.isdir(os.path.expanduser(x.strip())) for x in d.split(":")):

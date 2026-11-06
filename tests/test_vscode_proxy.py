@@ -15,6 +15,9 @@ def upstream(conn):
     if hdr.get("upgrade") == "websocket":
         conn.sendall(b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n")
         while b := f.read1(65536): conn.sendall(b.upper())
+    elif head[0].startswith("GET /vscode/?"):
+        out = b'<meta id="vscode-workbench-web-configuration" data-settings="{&quot;a&quot;:1}">'
+        conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nSet-Cookie: t=1\r\nTransfer-Encoding: chunked\r\n\r\n%x\r\n%s\r\n0\r\n\r\n" % (len(out), out))
     else:
         body = f.read(int(hdr.get("content-length", 0)))
         out = f"{head[0]}|{hdr.get('connection')}|{hdr.get('host')}|".encode() + body
@@ -51,6 +54,11 @@ assert r.startswith(b"HTTP/1.1 101"), r
 s.sendall(b"ping")
 assert s.recv(100) == b"PING"
 s.close()
+
+# the workbench page gets a default that follows the system colour scheme; its cookie stays, chunking does not
+_, r = raw(b"GET /vscode/?tkn=x HTTP/1.1\r\nHost: h\r\nAccept-Encoding: gzip\r\n\r\n")
+assert b"Set-Cookie: t=1" in r and b"Transfer-Encoding" not in r, r
+assert r.endswith(b'data-settings="{&quot;configurationDefaults&quot;:{&quot;window.autoDetectColorScheme&quot;:true},&quot;a&quot;:1}">'), r
 
 # VS Code gone: a 502, not a hang
 gone = socket.socket(); gone.bind(("127.0.0.1", 0)); VSCODE["port"] = gone.getsockname()[1]; gone.close()
