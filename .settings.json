@@ -1,6 +1,6 @@
 {
   "projects": "~/Projects",
-  "theme": "dracula",
+  "theme": "native",
   "themes": [
     {
       "id": "native",

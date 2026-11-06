@@ -1,5 +1,5 @@
 // Network first: the page carries a per-run token, so the cached copy is only an offline fallback.
-// /api/ is never cached.
+// /api/ and /vscode/ (VS Code for the web, proxied) are never cached.
 const CACHE = "cs-v1";
 const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/favicon-32.png"];
 
@@ -15,7 +15,7 @@ self.addEventListener("activate", e => {
 
 self.addEventListener("fetch", e => {
   const u = new URL(e.request.url);
-  if (e.request.method !== "GET" || u.origin !== location.origin || u.pathname.startsWith("/api/")) return;
+  if (e.request.method !== "GET" || u.origin !== location.origin || u.pathname.startsWith("/api/") || /^\/vscode(\/|$)/.test(u.pathname)) return;
   e.respondWith(fetch(e.request)
     .then(r => {
       if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }

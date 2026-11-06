@@ -59,6 +59,10 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
 .fx-switch label:has(:checked) { color: var(--bg); }
 .fx-switch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
 .fx-ed [hidden] { display: none !important; }
+/* a session in VS Code gets VS Code itself (code serve-web) in place of files, editor, terminal and git */
+.tx-view.fx:not(.fx-vson) .fx-vs, .tx-view.fx.fx-vson .fx-files, .tx-view.fx.fx-vson .fx-ed, .tx-view.fx.fx-vson .fx-right, .fx-vs [hidden] { display: none; }
+.fx-vs iframe { flex: 1; min-height: 0; width: 100%; border: 0; }
+@media (min-width: 901px) { .tx-view.fx.fx-vson:not([hidden]) { grid-template-columns: minmax(0, var(--fx-chat, 2fr)) minmax(0, var(--fx-ed, 3fr)); } .tx-view.fx.fx-vson .fx-split { grid-area: 2 / 2; } }
 .fx-term { flex: 1; min-height: 0; padding: 6px 0 0 8px; overflow: hidden; }
 .fx-term .xterm { height: 100%; }
 /* the rows rarely fill the pane exactly: what is left over shows the pane, not xterm's black */
@@ -215,6 +219,7 @@ html, body { overflow: hidden; }
       <div class="txs" id="txs"></div>
       <div class="fx-split fx-only" id="fxSplit" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize chat and editor" aria-valuemin="20" aria-valuemax="80" title="Drag to resize the chat and the editor"></div>
       <aside class="chat fx-pane fx-ed fx-only" aria-label="Editor or terminal"><div class="chat-head"><div class="fx-switch" id="fxMode" role="radiogroup" aria-label="Section type"><label><input type="radio" name="fxmode" value="editor">Editor</label><label><input type="radio" name="fxmode" value="terminal">Terminal</label></div><span class="chat-side" id="fxEdPath"></span><button type="button" class="tk-btn" id="fxEdSave" title="Save (⌘/ctrl-S)" disabled>Save</button></div><nav class="fx-shown" id="fxShown" aria-label="Files Claude showed" hidden></nav><div class="fx-editor" id="fxEdWrap"><pre class="fx-nums" id="fxEdNums" aria-hidden="true"></pre><div class="fx-edmain"><div class="fx-curline" id="fxEdLine" hidden></div><pre class="fx-hl" id="fxEdHl" aria-hidden="true"></pre><textarea id="fxEd" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File contents" placeholder="Click a file to open it here" readonly></textarea></div></div><div class="fx-term" id="fxTerm" hidden></div></aside>
+      <aside class="chat fx-pane fx-vs fx-only" aria-label="VS Code"><div class="chat-head"><span class="chat-title">VS Code</span><span class="chat-side" id="fxVsSide"></span></div><iframe id="fxVs" title="VS Code" hidden></iframe><div class="chat-log dim" id="fxVsMsg"></div></aside>
       <div class="fx-right fx-only">
         <aside class="chat fx-pane" aria-label="Git status"><div class="chat-head"><span class="chat-title">Git Status</span></div><form class="fx-git" id="fxGitBar" hidden><input name="msg" placeholder="Commit message" aria-label="Commit message" spellcheck="false" autocomplete="off"><button type="button" class="tk-btn" data-git="message" title="Write the message with Claude, from what commit would take: it reads the diff">Generate</button><button type="submit" class="tk-btn" title="Commit what is staged, or every change if nothing is staged">Commit</button><button type="button" class="tk-btn" data-git="push">Push</button><button type="button" class="tk-btn" data-git="fetch">Fetch</button><div class="fx-git-out" id="fxGitOut" role="status"></div></form><div class="chat-log" id="fxGit"></div></aside>
         <aside class="chat fx-pane" aria-label="Session information"><div class="chat-head"><span class="chat-title">Session</span></div><div class="chat-log" id="fxInfo"></div></aside>
@@ -344,7 +349,7 @@ let tab = ["tasks", "tx", "focus"].includes(store.get("cs.tab")) ? store.get("cs
 let tkShow = store.get("cs.tkshow") === "all" ? "all" : "open";
 let tkSel = null, tkCur = null, tkLoading = null, tkMode = null, tkSig = "", tkInfoSig = "", tkDlSig = "";
 let txSizes = {}, txOrder = [], txDrag = null, txScrollTo = null;
-let fxSid = null, fxT = 0, fxData = null;
+let fxSid = null, fxT = 0, fxData = null, fxVsT = 0;
 let fxEdit = null, fxReq = 0, fxEdLines = 0;
 let fxMode = store.get("cs.fxmode") === "terminal" ? "terminal" : "editor";
 let fxTerm = null, fxFit = null, fxTermCwd = null, fxTermCtl = null, fxTermOut = "", fxTermBusy = false, fxTermOver = false, fxTermT = 0;
@@ -1020,7 +1025,7 @@ async function fxTermStream(r, ctl) {
 
 // the stream runs only while the terminal shows; the shell keeps running without it
 function fxTermSync() {
-  const r = tab === "focus" && fxMode === "terminal" ? S?.sessions.find(x => x.sid === fxSid) : null, cwd = r?.cwd ?? null;
+  const r = tab === "focus" && fxMode === "terminal" ? S?.sessions.find(x => x.sid === fxSid && x.entry !== "claude-vscode") : null, cwd = r?.cwd ?? null;
   if (cwd === fxTermCwd) return;
   fxTermCtl?.abort();
   fxTermCtl = null;
@@ -1063,6 +1068,21 @@ function fxNameSet(r, rows) {
   };
 }
 
+// VS Code sessions: one shared code serve-web, opened on the session's folder; it can take a while to start the first time
+function fxVsSync(r) {
+  const on = r.entry === "claude-vscode", f = $("fxVs");
+  $("txView").classList.toggle("fx-vson", on);
+  if (!on || f._cwd === r.cwd || Date.now() - fxVsT < 1000) return;
+  fxVsT = Date.now();
+  $("fxVsSide").textContent = home(r.cwd);
+  api(`/api/vscode?sid=${encodeURIComponent(r.sid)}`).then(d => {
+    if (fxSid !== r.sid) return;
+    if (d.url) { f.src = d.url; f._cwd = r.cwd; f.hidden = false; }
+    $("fxVsMsg").textContent = d.url ? "" : d.err || "starting VS Code…";
+    $("fxVsMsg").hidden = !!d.url;
+  }).catch(e => { $("fxVsMsg").textContent = `VS Code: ${e.message}`; });
+}
+
 function renderFocus(rows) {
   if (rows.length && !rows.some(r => r.sid === sel)) sel = rows[0].sid;
   $("fxPrev").disabled = sel === rows[0]?.sid;
@@ -1070,6 +1090,7 @@ function renderFocus(rows) {
   const r = rows.find(x => x.sid === sel);
   fxNameSet(r, rows);
   if (!r) return;
+  fxVsSync(r);
   if (r.sid !== fxSid) {
     fxSid = r.sid; fxData = null; fxT = 0; $("fxCode")._sig = null; $("fxCode").innerHTML = "";
     // a half-written message must not get committed to the next session's repo

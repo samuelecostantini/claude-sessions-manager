@@ -1846,6 +1846,68 @@ def pty_chunk(p, at, alive=lambda: True):
         # a reader further behind than PTY_KEEP skips ahead
         return p["buf"][max(0, at - p["end"] + len(p["buf"])):], p["end"]
 
+import socket
+VSCODE, VSCODE_LOCK = {}, threading.Lock()
+
+def vscode_url(cwd):
+    """VS Code for the web (`code serve-web`) behind /vscode/ on cs's own server: it refuses to be framed from another origin."""
+    import secrets, urllib.parse
+    with VSCODE_LOCK:
+        p = VSCODE.get("proc")
+        if not p or p.poll() is not None:
+            code = shutil.which("code") or "/usr/local/bin/code"
+            if not os.path.exists(code): return None, "the VS Code `code` command is not installed (VS Code: Shell Command: Install 'code' command in PATH)"
+            with socket.socket() as s:
+                s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]
+            tok = secrets.token_urlsafe(24)
+            try:
+                p = subprocess.Popen([code, "serve-web", "--host", "127.0.0.1", "--port", str(port), "--connection-token", tok,
+                    "--accept-server-license-terms", "--server-base-path", "/vscode"], stdin=subprocess.DEVNULL,
+                    stdout=open(f"{HOME}/state/cs-vscode.log", "w"), stderr=subprocess.STDOUT, start_new_session=True)
+            except OSError as e: return None, f"cannot start VS Code: {e}"
+            if not VSCODE: atexit.register(lambda: VSCODE["proc"].poll() is None and os.killpg(VSCODE["proc"].pid, 15))
+            VSCODE.update(proc=p, port=port, tok=tok)
+        try: socket.create_connection(("127.0.0.1", VSCODE["port"]), 0.2).close()
+        except OSError: return None, None
+    return f"/vscode/?tkn={VSCODE['tok']}&folder={urllib.parse.quote(cwd)}", None
+
+def vscode_proxy(h):
+    """Pipes one request (or a WebSocket) from the handler h to code serve-web and its answer back."""
+    port = VSCODE.get("port")
+    if not port: return h.reply(503, {"error": "VS Code is not running"})
+    try: up = socket.create_connection(("127.0.0.1", port), 5)
+    except OSError: return h.reply(502, {"error": "VS Code is not answering"})
+    up.settimeout(None)
+    ws = h.headers.get("Upgrade", "").lower() == "websocket"
+    hdr = [f"{k}: {v}" for k, v in h.headers.items() if ws or k.lower() not in ("connection", "keep-alive")]
+    # one request per connection: the reply then ends when VS Code closes it
+    if not ws: hdr.append("Connection: close")
+    up.sendall((f"{h.command} {h.path} HTTP/1.1\r\n" + "".join(x + "\r\n" for x in hdr) + "\r\n").encode("latin-1"))
+    h.close_connection = True
+    def up_pump():
+        try:
+            if not ws:
+                n = int(h.headers.get("Content-Length") or 0)
+                while n > 0:
+                    b = h.rfile.read(min(n, 65536))
+                    if not b: break
+                    up.sendall(b); n -= len(b)
+                return
+            while b := h.rfile.read1(65536): up.sendall(b)
+        except (OSError, ValueError): pass
+        finally:
+            if ws:
+                try: up.shutdown(socket.SHUT_WR)
+                except OSError: pass
+    threading.Thread(target=up_pump, daemon=True).start()
+    try:
+        while b := up.recv(65536): h.wfile.write(b)
+    except OSError: pass
+    finally:
+        up.close()
+        try: h.connection.shutdown(socket.SHUT_RDWR)
+        except OSError: pass
+
 def server(port):
     import threading, secrets
     from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -1927,6 +1989,12 @@ def server(port):
         def do_GET(self):
             u = urlparse(self.path)
             if not self.allowed(u.path.startswith("/api/")): return
+            if u.path == "/vscode" or u.path.startswith("/vscode/"): return vscode_proxy(self)
+            if u.path == "/api/vscode":
+                row = row_of((parse_qs(u.query).get("sid") or [""])[0])
+                if not row: return self.reply(404, {"error": "session not found"})
+                url, err = vscode_url(row["cwd"])
+                return self.reply(200, dict(url=url, err=err))
             if u.path == "/":
                 try: html = open(page, encoding="utf-8").read()
                 except OSError as e: return self.reply(500, f"cannot read {page}: {e}".encode(), "text/plain; charset=utf-8")
@@ -1988,6 +2056,7 @@ def server(port):
 
         def do_POST(self):
             u = urlparse(self.path)
+            if u.path == "/vscode" or u.path.startswith("/vscode/"): return self.allowed(False) and vscode_proxy(self)
             if not self.allowed(True): return
             try:
                 n = int(self.headers.get("Content-Length") or 0)
