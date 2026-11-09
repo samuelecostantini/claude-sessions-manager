@@ -58,7 +58,7 @@ every change including untracked files if nothing is staged. `push` asks first, 
 `generate` fills in the message with a headless `claude -p` (`$CS_CHAT_MODEL`), for you to edit before committing. It sees the
 diff of what `commit` would take (first 30k characters), the names of new files and the recent commit subjects.
 
-The button in the `Files` title collapses that pane to a thin rail and gives its width to the others; the choice is remembered.
+The buttons in the `Files` and chat titles collapse those panes to thin rails and give their width to the others; the choices are remembered.
 
 Click a file in the codebase to edit it, `⌘/ctrl-S` or `save` writes it. The editor has line numbers, indent guides,
 syntax colors (JS/TS, Python, shell, PHP, C-family, CSS, HTML, JSON, YAML/TOML, Markdown; files over 150 KB stay plain)

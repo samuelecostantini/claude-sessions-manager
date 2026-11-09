@@ -39,16 +39,19 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / .35); }
 .keys-list dd { margin: 0; color: var(--dim); }
 .keys-list dd::first-letter { text-transform: uppercase; }
 .tx-view.fx { position: relative; }
-.fx-files .chat-head .fx-files-btn { flex: none; display: grid; place-items: center; box-sizing: border-box; width: 24px; height: 22px; padding: 0; pointer-events: auto; }
-.fx-files-btn .ic { display: block; margin: 0; }
-.fx-files .chat-head { align-items: center; }
-.fx-files .chat-side { flex: 1; min-width: 0; }
-/* the rail keeps only the button; themes differ on the head, so it is reset here. Selectors outrank the themes' own, loaded after this */
+.tx-view.fx .chat-head .fx-rail-btn { flex: none; display: grid; place-items: center; box-sizing: border-box; width: 24px; height: 22px; padding: 0; pointer-events: auto; }
+.fx-rail-btn .ic { display: block; margin: 0; }
+.fx-files .chat-head, .tx-view.fx .txbox .chat-head { align-items: center; }
+.fx-files .chat-side, .tx-view.fx .txbox .chat-side { flex: 1; min-width: 0; }
+/* the rails keep only the button; themes differ on the head, so it is reset here. Selectors outrank the themes' own, loaded after this */
+.tx-view.fx.fx-nochat .txbox > :not(.chat-head), .tx-view.fx.fx-nochat .txbox .chat-title, .tx-view.fx.fx-nochat .txbox .chat-side, .tx-view.fx.fx-nochat .fx-split { display: none; }
+.tx-view.fx.fx-nochat .txbox { padding: 6px 0; align-items: center; }
+.tx-view.fx.fx-nochat .txbox .chat-head { position: static; justify-content: center; margin: 0; padding: 0; border: 0; background: none; }
 .tx-view.fx.fx-nofiles .fx-files { padding: 6px 0; align-items: center; }
 .tx-view.fx.fx-nofiles .fx-files .chat-head { position: static; justify-content: center; margin: 0; padding: 0; border: 0; background: none; }
 .tx-view.fx.fx-nofiles .fx-files .chat-title, .tx-view.fx.fx-nofiles .fx-files .chat-side, .tx-view.fx.fx-nofiles .fx-files .fx-tree { display: none; }
-@media (min-width: 901px) { .tx-view.fx.fx-nofiles:not([hidden]) { grid-template-columns: 38px minmax(0, var(--fx-chat, 2fr)) minmax(0, var(--fx-ed, 2fr)) minmax(170px, .8fr); } }
-@media (max-width: 900px) { .tx-view.fx.fx-nofiles .fx-files { height: auto; } }
+@media (min-width: 901px) { .body > .tx-view.fx:not([hidden]) { grid-template-columns: var(--fx-files, minmax(160px, .7fr)) var(--fx-txs, minmax(0, var(--fx-chat, 2fr))) minmax(0, var(--fx-ed, 2fr)) minmax(170px, .8fr); } .tx-view.fx.fx-nofiles { --fx-files: 38px; } .tx-view.fx.fx-nochat { --fx-txs: 38px; } }
+@media (max-width: 900px) { .tx-view.fx.fx-nofiles .fx-files, .tx-view.fx.fx-nochat .txs { height: auto; } }
 /* native radios underneath: arrow keys and screen readers work; the opaque track also suits themes whose titles sit on the pane's border */
 .fx-switch { position: relative; flex: none; display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 6px; pointer-events: auto; background: color-mix(in srgb, var(--fg) 12%, var(--bg)); }
 .fx-switch::before { content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 4px; background: var(--orange); box-shadow: 0 1px 2px rgba(0, 0, 0, .3); transition: transform .18s ease; }
@@ -211,7 +214,7 @@ html, body { overflow: hidden; }
     <div class="tbl-wrap" id="table" hidden></div>
     <section class="tx-view" id="txView" aria-label="Transcripts" hidden>
       <div class="tk-bar fx-only"><div class="fx-nav" id="fxNav" role="group" aria-label="Switch session"><button type="button" class="tk-btn" id="fxPrev" data-ic="left" data-key="ArrowLeft" title="Previous session (←)" aria-label="Previous session"></button><span class="fx-name" id="fxName" aria-live="polite"><span></span></span><button type="button" class="tk-btn" id="fxNext" data-ic="right" data-key="ArrowRight" title="Next session (→)" aria-label="Next session"></button></div></div>
-      <aside class="chat fx-pane fx-files fx-only" aria-label="Codebase"><div class="chat-head"><span class="chat-title">Files</span><span class="chat-side" id="fxCodeSide"></span><button type="button" class="tk-btn fx-files-btn" id="fxFilesBtn" data-ic="sidebar" aria-controls="fxCode"></button></div><div class="chat-log fx-tree" id="fxCode"></div></aside>
+      <aside class="chat fx-pane fx-files fx-only" aria-label="Codebase"><div class="chat-head"><span class="chat-title">Files</span><span class="chat-side" id="fxCodeSide"></span><button type="button" class="tk-btn fx-rail-btn" id="fxFilesBtn" data-ic="sidebar" aria-controls="fxCode"></button></div><div class="chat-log fx-tree" id="fxCode"></div></aside>
       <div class="txs" id="txs"></div>
       <div class="fx-split fx-only" id="fxSplit" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize chat and editor" aria-valuemin="20" aria-valuemax="80" title="Drag to resize the chat and the editor"></div>
       <aside class="chat fx-pane fx-ed fx-only" aria-label="Editor or terminal"><div class="chat-head"><div class="fx-switch" id="fxMode" role="radiogroup" aria-label="Section type"><label><input type="radio" name="fxmode" value="editor">Editor</label><label><input type="radio" name="fxmode" value="terminal">Terminal</label></div><span class="chat-side" id="fxEdPath"></span><button type="button" class="tk-btn" id="fxEdSave" title="Save (⌘/ctrl-S)" disabled>Save</button></div><nav class="fx-shown" id="fxShown" aria-label="Files Claude showed" hidden></nav><div class="fx-editor" id="fxEdWrap"><pre class="fx-nums" id="fxEdNums" aria-hidden="true"></pre><div class="fx-edmain"><div class="fx-curline" id="fxEdLine" hidden></div><pre class="fx-hl" id="fxEdHl" aria-hidden="true"></pre><textarea id="fxEd" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File contents" placeholder="Click a file to open it here" readonly></textarea></div></div><div class="fx-term" id="fxTerm" hidden></div></aside>
@@ -661,7 +664,7 @@ function renderTx() {
     if (!el) {
       el = document.createElement("article");
       el.dataset.sid = r.sid;
-      el.innerHTML = `<div class="chat-head" draggable="true"><span class="chat-title"></span><span class="chat-side"></span></div><div class="chat-log"></div><button type="button" class="tx-down" data-act="down" title="Go to the latest message" aria-label="Go to the latest message" hidden>${ph("down")}</button>`
+      el.innerHTML = `<div class="chat-head" draggable="true"><span class="chat-title"></span><span class="chat-side"></span><button type="button" class="tk-btn fx-rail-btn fx-only" data-act="chat" aria-controls="txs">${ph("chat", "ic")}</button></div><div class="chat-log"></div><button type="button" class="tx-down" data-act="down" title="Go to the latest message" aria-label="Go to the latest message" hidden>${ph("down")}</button>`
         + `<div class="tx-ask" hidden></div>`
         + `<div class="chat-field"><span class="p">❯</span><input class="tx-input" autocomplete="off" spellcheck="false">`
         + `<span class="tx-size" role="group" aria-label="Box size"><span class="tx-size-pop">${TX_SIZES.map(z => `<button type="button" data-size="${z}" title="${txSizeName(z)}" aria-label="size ${txSizeName(z)}">${txIcon(z)}</button>`).join("")}</span></span>`
@@ -700,6 +703,8 @@ function renderTx() {
     inp.disabled = t.mode === "none";
     inp.placeholder = txPlaceholder(r);
     inp.setAttribute("aria-label", `Message to ${title}`);
+    const cb = el.querySelector("[data-act=chat]"), open = !$("txView").classList.contains("fx-nochat"), lab = open ? "Hide chat" : "Show chat";
+    cb.title = lab; cb.setAttribute("aria-label", lab); cb.setAttribute("aria-expanded", String(open));
     const mode = el.querySelector(".tx-mode");
     mode.hidden = !t.perm;
     if (t.perm && document.activeElement !== mode) mode.value = t.perm;
@@ -942,6 +947,12 @@ function fxFilesSet(open) {
   b.title = label;
   b.setAttribute("aria-label", label);
   b.setAttribute("aria-expanded", String(open));
+}
+
+function fxChatSet(open) {
+  store.set("cs.fxchat", open ? "1" : "0");
+  $("txView").classList.toggle("fx-nochat", !open);
+  render();
 }
 
 function fxModeSet(m) {
@@ -1857,11 +1868,15 @@ $("txs").addEventListener("click", e => {
   if (size) txResize(sel, size);
   else if (act === "focus") focusSel();
   else if (act === "fx") setTab("focus");
+  else if (act === "chat") fxChatSet($("txView").classList.contains("fx-nochat"));
   else if (act === "allow" || act === "deny") txAct("/api/session/answer", { sid: sel, allow: act === "allow" });
   else if (act === "stop") txAct("/api/session/stop", { sid: sel });
   else if (act === "down") { el.querySelector(".chat-log")._up = false; render(); }
   else render();
 });
+$("txs").addEventListener("mousedown", e => { if (e.target.closest("[data-act=chat]")) e.preventDefault(); });
+// enter and space belong to the button, not to the page's shortcuts
+$("txs").addEventListener("keydown", e => { if (e.target.closest("[data-act=chat]") && (e.key === "Enter" || e.key === " ")) e.stopPropagation(); });
 $("txs").addEventListener("dragstart", e => {
   const b = e.target.closest?.(".txbox");
   if (!b) return;
@@ -1950,6 +1965,7 @@ $("fxFilesBtn").addEventListener("click", () => fxFilesSet($("txView").classList
 // enter and space belong to the button, not to the page's shortcuts
 $("fxFilesBtn").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); });
 fxFilesSet(store.get("cs.fxfiles") !== "0");
+$("txView").classList.toggle("fx-nochat", store.get("cs.fxchat") === "0");
 $("fxMode").addEventListener("change", e => { e.target.blur(); fxModeSet(e.target.value); });
 $("theme-css").addEventListener("load", () => { if (!fxTerm) return; Object.assign(fxTerm.options, fxTermStyle()); if ($("fxTerm").offsetWidth) fxFit.fit(); });
 fxModeSet(fxMode);
